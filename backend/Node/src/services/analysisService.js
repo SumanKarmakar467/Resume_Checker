@@ -184,17 +184,20 @@ function scoreKeywordMatch(normalizedResume, keywords) {
   const issues = [];
   const suggestions = [];
   const missingKeywords = [];
+  const matchedKeywords = [];
 
   if (keywords.length === 0) {
     issues.push('Job description keywords were not provided.');
     suggestions.push('Paste the job description to get more accurate ATS matching.');
-    return { feedback: buildFeedback('Keyword Match', 0, issues, suggestions), missingKeywords };
+    return { feedback: buildFeedback('Keyword Match', 0, issues, suggestions), missingKeywords, matchedKeywords };
   }
 
   let matched = 0;
   for (const keyword of keywords) {
-    if (normalizedResume.includes(keyword)) matched += 1;
-    else missingKeywords.push(keyword);
+    if (normalizedResume.includes(keyword)) {
+      matched += 1;
+      matchedKeywords.push(keyword);
+    } else missingKeywords.push(keyword);
   }
 
   const score = Math.round((matched * 100) / keywords.length);
@@ -205,8 +208,73 @@ function scoreKeywordMatch(normalizedResume, keywords) {
 
   return {
     feedback: buildFeedback('Keyword Match', score, issues, suggestions),
-    missingKeywords: missingKeywords.slice(0, 20)
+    missingKeywords: missingKeywords.slice(0, 20),
+    matchedKeywords: matchedKeywords.slice(0, 20)
   };
+}
+
+function scoreFormatting(rawResume = '', normalizedResume = '') {
+  const issues = [];
+  const suggestions = [];
+
+  const lines = rawResume.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const wordCount = normalizedResume.split(/\s+/).filter(Boolean).length;
+  const headingCount = lines.filter((line) => /^[A-Z][A-Z\s&]{2,}$/.test(line)).length;
+  const bulletCount = lines.filter((line) => /^[-*]/.test(line)).length;
+
+  let score = 30;
+
+  if (wordCount >= 250 && wordCount <= 900) score += 25;
+  else {
+    issues.push('Resume length may be too short or too long for ATS screening.');
+    suggestions.push('Keep resume around one page with concise, impact-focused bullets.');
+  }
+
+  if (headingCount >= 3) score += 25;
+  else {
+    issues.push('Resume headings are weak or missing.');
+    suggestions.push('Use clear headings like SUMMARY, SKILLS, EXPERIENCE, EDUCATION.');
+  }
+
+  if (bulletCount >= 6) score += 20;
+  else {
+    issues.push('Not enough bullet points for readable ATS structure.');
+    suggestions.push('Use bullet points in experience/projects for easier parsing.');
+  }
+
+  return buildFeedback('Formatting', score, issues, suggestions);
+}
+
+function calculatePanelScores(sections) {
+  const findScore = (name) => sections.find((section) => section.section === name)?.score || 0;
+  const average = (values) => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+
+  const contentScore = average([
+    findScore('Professional Summary'),
+    findScore('Skills'),
+    findScore('Experience'),
+    findScore('Keyword Match')
+  ]);
+
+  const sectionsScore = average([
+    findScore('Contact Information'),
+    findScore('Skills'),
+    findScore('Experience'),
+    findScore('Education')
+  ]);
+
+  const atsEssentialsScore = average([
+    findScore('Keyword Match'),
+    findScore('Formatting'),
+    findScore('Contact Information')
+  ]);
+
+  const tailoringScore = average([
+    findScore('Keyword Match'),
+    findScore('Professional Summary')
+  ]);
+
+  return { contentScore, sectionsScore, atsEssentialsScore, tailoringScore };
 }
 
 function deduplicate(values) {
@@ -220,7 +288,8 @@ function analyzeResume(resumeText, jobDescription) {
     scoreSummary(normalizedResume),
     scoreSkills(normalizedResume),
     scoreExperience(normalizedResume),
-    scoreEducation(normalizedResume)
+    scoreEducation(normalizedResume),
+    scoreFormatting(resumeText, normalizedResume)
   ];
 
   const jobKeywords = extractKeywords(jobDescription);
@@ -230,11 +299,14 @@ function analyzeResume(resumeText, jobDescription) {
   const overallScore = Math.round(sections.reduce((sum, section) => sum + section.score, 0) / sections.length);
 
   const suggestions = deduplicate(sections.filter((s) => s.score < 70).flatMap((s) => s.suggestions));
+  const panelScores = calculatePanelScores(sections);
 
   return {
     overallScore,
     sections,
+    matchedKeywords: keywordResult.matchedKeywords,
     missingKeywords: keywordResult.missingKeywords,
+    panelScores,
     suggestions: suggestions.length
       ? suggestions
       : ['Great baseline ATS compatibility. Tailor your resume for each job description before applying.'],

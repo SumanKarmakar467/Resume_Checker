@@ -6,9 +6,14 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      cb(new Error('Only PDF files are supported.'));
+    const fileName = file.originalname.toLowerCase();
+    const isPdf = file.mimetype === 'application/pdf' || fileName.endsWith('.pdf');
+    const isDocx =
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      fileName.endsWith('.docx');
+
+    if (!isPdf && !isDocx) {
+      cb(new Error('Only PDF and DOCX files are supported.'));
       return;
     }
     cb(null, true);

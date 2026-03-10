@@ -10,7 +10,7 @@ function UploadResume() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [analysis, setAnalysis] = useState(null);
-  const [generatedResume, setGeneratedResume] = useState('');
+  const [resumeDraft, setResumeDraft] = useState('');
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -27,16 +27,26 @@ function UploadResume() {
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
+  const fetchAtsDraft = async (resumeText, jd) => {
+    const response = await axios.post(`${API_BASE_URL}/generate-ats`, {
+      resumeText,
+      jobDescription: jd
+    });
+
+    return response?.data?.generatedResume || '';
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!file) {
-      setError('Please upload your resume in PDF format.');
+      setError('Please upload your resume in PDF or DOCX format.');
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setError('Only PDF files are supported right now.');
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx')) {
+      setError('Only PDF or DOCX files are supported right now.');
       return;
     }
 
@@ -48,25 +58,30 @@ function UploadResume() {
     setLoading(true);
     setError('');
     setAnalysis(null);
-    setGeneratedResume('');
+    setResumeDraft('');
 
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('jobDescription', jobDescription);
 
-      const response = await axios.post(`${API_BASE_URL}/analyze`, formData, {
+      const analysisResponse = await axios.post(`${API_BASE_URL}/analyze`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
 
-      setAnalysis(response.data);
+      const analysisResult = analysisResponse.data;
+      setAnalysis(analysisResult);
+
+      if (analysisResult?.extractedText) {
+        const draft = await fetchAtsDraft(analysisResult.extractedText, jobDescription);
+        setResumeDraft(draft);
+      }
     } catch (requestError) {
       const status = requestError?.response?.status;
       const responseData = requestError?.response?.data;
-      const serverMessage =
-        (typeof responseData === 'string' ? responseData : responseData?.error || responseData?.message);
+      const serverMessage = typeof responseData === 'string' ? responseData : responseData?.error || responseData?.message;
       const networkMessage = requestError?.message;
       setError(
         serverMessage ||
@@ -88,12 +103,8 @@ function UploadResume() {
     try {
       setLoading(true);
       setError('');
-      const response = await axios.post(`${API_BASE_URL}/generate-ats`, {
-        resumeText: analysis.extractedText,
-        jobDescription
-      });
-
-      setGeneratedResume(response.data.generatedResume || '');
+      const draft = await fetchAtsDraft(analysis.extractedText, jobDescription);
+      setResumeDraft(draft);
     } catch (requestError) {
       const status = requestError?.response?.status;
       const serverMessage = requestError?.response?.data?.error;
@@ -111,13 +122,13 @@ function UploadResume() {
 
   return (
     <main className="app-bg min-h-screen px-4 py-8 text-slate-900 transition-colors duration-300 dark:text-slate-100 md:px-6 md:py-12">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4 reveal-up">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-600 dark:text-emerald-300">Resume Intelligence Studio</p>
-            <h1 className="mt-1 text-3xl font-extrabold leading-tight md:text-4xl">ATS Resume Checker</h1>
+            <h1 className="mt-1 text-3xl font-extrabold leading-tight md:text-4xl">ATS Resume Checker + Builder</h1>
             <p className="mt-2 text-slate-700 dark:text-slate-300">
-              Upload PDF resume, detect weak ATS sections, and generate an ATS-friendly version.
+              Upload your resume, see ATS feedback on the left, and build ATS-friendly resume content on the right.
             </p>
           </div>
 
@@ -134,17 +145,15 @@ function UploadResume() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="upload-zone rounded-2xl border border-dashed border-sky-400/70 p-5 transition hover:scale-[1.005] dark:border-sky-400/45">
               <label className="mb-2 block text-sm font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">
-                Upload Resume (PDF)
+                Upload Resume (PDF or DOCX)
               </label>
               <input
                 type="file"
-                accept=".pdf,application/pdf"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={(event) => setFile(event.target.files?.[0] || null)}
                 className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white/80 p-2.5 text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-300 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
               />
-              {file ? (
-                <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">Selected: {file.name}</p>
-              ) : null}
+              {file ? <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">Selected: {file.name}</p> : null}
             </div>
 
             <div>
@@ -170,21 +179,20 @@ function UploadResume() {
                 disabled={loading}
                 className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
               >
-                {loading ? 'Processing...' : 'Check ATS Score'}
-              </button>
-
-              <button
-                type="button"
-                disabled={loading || !analysis}
-                onClick={handleGenerateAtsResume}
-                className="rounded-xl bg-gradient-to-r from-emerald-600 to-lime-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
-              >
-                Generate ATS-Friendly Resume
+                {loading ? 'Processing...' : 'Analyze Resume'}
               </button>
             </div>
           </form>
 
-          {analysis ? <Result analysis={analysis} generatedResume={generatedResume} /> : null}
+          {analysis ? (
+            <Result
+              analysis={analysis}
+              resumeDraft={resumeDraft}
+              setResumeDraft={setResumeDraft}
+              onGenerate={handleGenerateAtsResume}
+              loading={loading}
+            />
+          ) : null}
         </div>
       </div>
     </main>

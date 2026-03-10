@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 app.use('/api/resume', resumeRoutes);
 
 app.use((err, req, res, next) => {
-  if (err && err.message && err.message.includes('Only PDF files')) {
+  if (err && err.message && err.message.includes('Only PDF and DOCX files')) {
     return res.status(400).json({ error: err.message });
   }
 

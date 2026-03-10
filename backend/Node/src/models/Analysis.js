@@ -15,7 +15,14 @@ const analysisSchema = new mongoose.Schema(
   {
     overallScore: Number,
     sections: [sectionFeedbackSchema],
+    matchedKeywords: [String],
     missingKeywords: [String],
+    panelScores: {
+      contentScore: Number,
+      sectionsScore: Number,
+      atsEssentialsScore: Number,
+      tailoringScore: Number
+    },
     suggestions: [String],
     extractedText: String,
     jobDescription: String

@@ -1,6 +1,27 @@
 const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 const Analysis = require('../models/Analysis');
 const { analyzeResume, generateAtsFriendlyResume } = require('../services/analysisService');
+
+async function extractResumeText(file) {
+  const fileName = file.originalname.toLowerCase();
+  const isPdf = file.mimetype === 'application/pdf' || fileName.endsWith('.pdf');
+  const isDocx =
+    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    fileName.endsWith('.docx');
+
+  if (isPdf) {
+    const parsed = await pdfParse(file.buffer);
+    return parsed.text || '';
+  }
+
+  if (isDocx) {
+    const parsed = await mammoth.extractRawText({ buffer: file.buffer });
+    return parsed.value || '';
+  }
+
+  throw new Error('Unsupported resume file type.');
+}
 
 async function analyze(req, res) {
   try {
@@ -8,11 +29,10 @@ async function analyze(req, res) {
     const { jobDescription = '' } = req.body;
 
     if (!file) {
-      return res.status(400).json({ error: 'Please upload a PDF resume file.' });
+      return res.status(400).json({ error: 'Please upload a PDF or DOCX resume file.' });
     }
 
-    const parsed = await pdfParse(file.buffer);
-    const resumeText = parsed.text || '';
+    const resumeText = await extractResumeText(file);
 
     const result = analyzeResume(resumeText, jobDescription);
 
@@ -27,11 +47,11 @@ async function analyze(req, res) {
   } catch (error) {
     console.error('[analyze] Failed to process resume:', error);
     const rawMessage = error?.message || 'Unable to analyze resume.';
-    const isPdfReadIssue = /(formaterror|invalid pdf|xref|password|encrypted|unsupported|bad)/i.test(rawMessage);
+    const isReadIssue = /(formaterror|invalid pdf|xref|password|encrypted|unsupported|bad|docx|zip|mammoth)/i.test(rawMessage);
 
-    if (isPdfReadIssue) {
+    if (isReadIssue) {
       return res.status(400).json({
-        error: 'Unable to read this PDF. Please upload a text-based, non-password-protected PDF.'
+        error: 'Unable to read this file. Upload a text-based, non-password-protected PDF/DOCX resume.'
       });
     }
 

@@ -1,16 +1,71 @@
-function ScoreBar({ score }) {
+function ScoreGauge({ score }) {
   const safeScore = Math.max(0, Math.min(score || 0, 100));
-  const colorClass =
-    safeScore >= 80
-      ? 'from-emerald-500 to-green-400'
-      : safeScore >= 60
-        ? 'from-amber-500 to-orange-400'
-        : 'from-rose-500 to-red-400';
+  const radius = 70;
+  const circumference = Math.PI * radius;
+  const offset = circumference - (safeScore / 100) * circumference;
 
   return (
-    <div className="h-3 w-full rounded-full bg-slate-200 dark:bg-slate-700">
-      <div className={`h-3 rounded-full bg-gradient-to-r ${colorClass} transition-all duration-500`} style={{ width: `${safeScore}%` }} />
+    <div className="mx-auto w-[190px] pt-2 text-center">
+      <svg viewBox="0 0 180 110" className="h-[120px] w-full">
+        <path d="M20 90 A70 70 0 0 1 160 90" fill="none" stroke="rgb(226 232 240)" strokeWidth="18" strokeLinecap="round" />
+        <path
+          d="M20 90 A70 70 0 0 1 160 90"
+          fill="none"
+          stroke="url(#scoreGradient)"
+          strokeWidth="18"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 600ms ease' }}
+        />
+        <defs>
+          <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#fb923c" />
+            <stop offset="100%" stopColor="#f59e0b" />
+          </linearGradient>
+        </defs>
+        <line x1="26" y1="90" x2="154" y2="90" stroke="rgb(100 116 139)" strokeWidth="2" />
+        <circle cx="90" cy="90" r="4" fill="rgb(71 85 105)" />
+      </svg>
+
+      <p className="-mt-1 text-4xl font-extrabold text-amber-500">{safeScore}/100</p>
     </div>
+  );
+}
+
+function ScorePill({ score }) {
+  const safe = Math.max(0, Math.min(score || 0, 100));
+  const tone = safe >= 80 ? 'bg-emerald-100 text-emerald-700' : safe >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tone}`}>{safe}%</span>;
+}
+
+function metricStatus(hasIssue) {
+  return hasIssue ? '1 issue' : 'No issues';
+}
+
+function renderLinePreview(line, index) {
+  if (!line.trim()) return <div key={`sp-${index}`} className="h-3" />;
+  if (line.toUpperCase() === line && line.length <= 44) {
+    return (
+      <h4 key={`${line}-${index}`} className="mt-4 text-sm font-extrabold tracking-wide text-slate-800 dark:text-slate-100">
+        {line}
+      </h4>
+    );
+  }
+
+  if (line.startsWith('-')) {
+    return (
+      <li key={`${line}-${index}`} className="ml-4 list-disc text-sm text-slate-700 dark:text-slate-200">
+        {line.slice(1).trim()}
+      </li>
+    );
+  }
+
+  return (
+    <p key={`${line}-${index}`} className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+      {line}
+    </p>
   );
 }
 
@@ -24,107 +79,180 @@ function downloadAsText(content) {
   URL.revokeObjectURL(url);
 }
 
-function Result({ analysis, generatedResume }) {
-  const lowSections = (analysis.sections || []).filter((section) => section.score < 70);
+function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) {
+  const issuesCount = (analysis.sections || []).filter((section) => section.score < 70).length;
+  const panelScores = analysis.panelScores || {};
+
+  const parseSection = (analysis.sections || []).find((section) => section.section === 'Formatting');
+  const impactSection = (analysis.sections || []).find((section) => section.section === 'Experience');
+  const keywordSection = (analysis.sections || []).find((section) => section.section === 'Keyword Match');
+  const grammarSection = (analysis.sections || []).find((section) => section.section === 'Professional Summary');
+
+  const contentRows = [
+    {
+      name: 'ATS Parse Rate',
+      bad: (parseSection?.issues || []).length > 0,
+      score: parseSection?.score || 0
+    },
+    {
+      name: 'Quantifying Impact',
+      bad: (impactSection?.issues || []).some((issue) => issue.toLowerCase().includes('measurable')),
+      score: impactSection?.score || 0
+    },
+    {
+      name: 'Repetition',
+      bad: (keywordSection?.issues || []).length > 0,
+      score: keywordSection?.score || 0
+    },
+    {
+      name: 'Spelling & Grammar',
+      bad: (grammarSection?.issues || []).length > 0,
+      score: grammarSection?.score || 0
+    }
+  ];
+
+  const previewLines = resumeDraft.split('\n').slice(0, 46);
 
   return (
-    <section className="mt-8 space-y-6 text-slate-900 dark:text-slate-100 reveal-up">
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40">
-        <h2 className="text-xl font-semibold">ATS Score</h2>
-        <p className="mt-2 text-4xl font-extrabold">{analysis.overallScore}/100</p>
-        <div className="mt-3">
-          <ScoreBar score={analysis.overallScore} />
-        </div>
-      </div>
+    <section className="mt-8 grid gap-6 xl:grid-cols-[360px_1fr]">
+      <aside className="rounded-[28px] border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+        <h2 className="text-center text-4xl font-light tracking-tight">Your Score</h2>
+        <ScoreGauge score={analysis.overallScore} />
+        <p className="mt-1 text-center text-lg text-slate-600 dark:text-slate-300">{issuesCount} Issues</p>
 
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-950/40">
-        <h3 className="text-lg font-semibold">Section Analysis</h3>
-        <div className="mt-4 space-y-4">
-          {(analysis.sections || []).map((section) => (
-            <div key={section.section} className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/70">
-              <div className="flex items-center justify-between gap-4">
-                <p className="font-medium">{section.section}</p>
-                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                  {section.score}/100 ({section.status})
+        <div className="mt-6 border-t border-slate-200 pt-5 dark:border-slate-700">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-xs font-bold tracking-[0.16em] text-slate-500">CONTENT</p>
+            <ScorePill score={panelScores.contentScore || 0} />
+          </div>
+
+          <div className="space-y-3">
+            {contentRows.map((row) => (
+              <div key={row.name} className="flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-800 dark:text-slate-100">
+                  <span className={`mr-2 inline-block text-base ${row.bad ? 'text-rose-500' : 'text-emerald-500'}`}>{row.bad ? 'x' : '?'}</span>
+                  {row.name}
                 </p>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    row.bad ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  }`}
+                >
+                  {metricStatus(row.bad)}
+                </span>
               </div>
-              <div className="mt-2">
-                <ScoreBar score={section.score} />
-              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 space-y-2 border-t border-slate-200 pt-4 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold tracking-[0.16em] text-slate-500">SECTIONS</p>
+              <ScorePill score={panelScores.sectionsScore || 0} />
             </div>
-          ))}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold tracking-[0.16em] text-slate-500">ATS ESSENTIALS</p>
+              <ScorePill score={panelScores.atsEssentialsScore || 0} />
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold tracking-[0.16em] text-slate-500">TAILORING</p>
+              <ScorePill score={panelScores.tailoringScore || 0} />
+            </div>
+          </div>
         </div>
-      </div>
+      </aside>
 
-      <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-5 dark:border-rose-800/70 dark:bg-rose-950/30">
-        <h3 className="text-lg font-semibold text-rose-900 dark:text-rose-200">Highlighted Low-Score Portions</h3>
-        {lowSections.length === 0 ? (
-          <p className="mt-2 text-rose-700 dark:text-rose-300">No low sections detected. Keep tailoring for each job description.</p>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {lowSections.map((section) => (
-              <div key={section.section} className="rounded-xl bg-white/90 p-4 dark:bg-slate-900/70">
-                <p className="font-semibold">
-                  {section.section} ({section.score}/100)
-                </p>
-                {(section.issues || []).length > 0 ? (
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-300">
-                    {section.issues.map((issue) => (
-                      <li key={issue}>{issue}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-            ))}
+      <section className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-2xl font-bold">ATS Friendly Resume Builder</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Edit your ATS draft directly. The preview updates instantly.</p>
           </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-5 dark:border-amber-700/60 dark:bg-amber-950/25">
-        <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-200">Suggestions To Improve ATS Score</h3>
-        {(analysis.suggestions || []).length > 0 ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-amber-900 dark:text-amber-100">
-            {analysis.suggestions.map((suggestion) => (
-              <li key={suggestion}>{suggestion}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-amber-900 dark:text-amber-100">No specific suggestions generated.</p>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-sky-200 bg-sky-50/90 p-5 dark:border-sky-700/60 dark:bg-sky-950/25">
-        <h3 className="text-lg font-semibold text-sky-900 dark:text-sky-200">Missing Keywords</h3>
-        {(analysis.missingKeywords || []).length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {analysis.missingKeywords.map((keyword) => (
-              <span key={keyword} className="rounded-full bg-white px-3 py-1 text-sm font-medium text-sky-900 shadow-sm dark:bg-slate-900 dark:text-sky-200">
-                {keyword}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-sky-900 dark:text-sky-200">Good keyword coverage for this job description.</p>
-        )}
-      </div>
-
-      {generatedResume ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-5 dark:border-emerald-700/60 dark:bg-emerald-950/20">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-lg font-semibold text-emerald-900 dark:text-emerald-200">ATS-Friendly Resume Draft</h3>
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => downloadAsText(generatedResume)}
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              onClick={onGenerate}
+              disabled={loading}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
             >
-              Download .txt
+              {loading ? 'Building...' : 'Rebuild Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={() => downloadAsText(resumeDraft || '')}
+              disabled={!resumeDraft}
+              className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-900 disabled:opacity-60"
+            >
+              Download
             </button>
           </div>
-          <pre className="mt-3 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm text-slate-800 dark:bg-slate-900 dark:text-slate-100">
-            {generatedResume}
-          </pre>
         </div>
-      ) : null}
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Editable ATS Resume</p>
+                <span className="text-xs text-slate-500">{(resumeDraft || '').split(/\s+/).filter(Boolean).length} words</span>
+              </div>
+              <textarea
+                value={resumeDraft}
+                onChange={(event) => setResumeDraft(event.target.value)}
+                placeholder="Your ATS-friendly resume will appear here after analysis."
+                rows="20"
+                className="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-sm text-slate-800 shadow-sm outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 dark:border-slate-700 dark:bg-slate-950/35 dark:text-slate-100"
+              />
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Missing Keywords</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(analysis.missingKeywords || []).slice(0, 16).map((keyword) => (
+                  <button
+                    key={keyword}
+                    type="button"
+                    onClick={() => setResumeDraft((current) => `${current}\n- ${keyword}`.trim())}
+                    className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    + {keyword}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/25">
+            <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Live ATS Resume Preview</p>
+            <div className="max-h-[520px] overflow-auto rounded-lg bg-white p-4 shadow-sm dark:bg-slate-900">
+              {previewLines.length ? previewLines.map((line, index) => renderLinePreview(line, index)) : <p className="text-sm text-slate-500">No draft yet.</p>}
+            </div>
+
+            <div className="mt-4">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Matched Keywords</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(analysis.matchedKeywords || []).slice(0, 20).map((keyword) => (
+                  <span
+                    key={keyword}
+                    className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  >
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {(analysis.suggestions || []).length > 0 ? (
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/25">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">Improvement Suggestions</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-900 dark:text-amber-100">
+              {analysis.suggestions.slice(0, 8).map((suggestion) => (
+                <li key={suggestion}>{suggestion}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
     </section>
   );
 }
