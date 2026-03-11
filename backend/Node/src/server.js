@@ -9,7 +9,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+const allowedOrigins = (
+  process.env.ALLOWED_ORIGINS ||
+  'http://localhost:5173,http://127.0.0.1:5173,https://resume-checker-alpha-two.vercel.app'
+)
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -20,6 +23,7 @@ app.use(
       // Allow same-origin/non-browser requests (no Origin header)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (origin.endsWith('.vercel.app')) return callback(null, true);
       return callback(new Error('CORS not allowed for this origin'));
     }
   })
