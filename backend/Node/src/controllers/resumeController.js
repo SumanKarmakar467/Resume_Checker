@@ -61,10 +61,7 @@ async function analyze(req, res) {
 
 async function generateAts(req, res) {
   try {
-    const { resumeText, jobDescription = '' } = req.body;
-    if (!resumeText || !resumeText.trim()) {
-      return res.status(400).json({ error: 'resumeText is required.' });
-    }
+    const { resumeText = '', jobDescription = '' } = req.body;
 
     const generatedResume = generateAtsFriendlyResume(resumeText, jobDescription);
     return res.json({ generatedResume });
