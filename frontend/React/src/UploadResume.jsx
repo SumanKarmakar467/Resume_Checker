@@ -143,17 +143,34 @@ function UploadResume() {
 
         <div className="glow-card soft-grid rounded-3xl border border-white/60 bg-white/75 p-5 backdrop-blur-sm transition dark:border-slate-800 dark:bg-slate-900/70 md:p-8 reveal-up">
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="upload-zone rounded-2xl border border-dashed border-sky-400/70 p-5 transition hover:scale-[1.005] dark:border-sky-400/45">
-              <label className="mb-2 block text-sm font-bold uppercase tracking-wide text-sky-800 dark:text-sky-200">
-                Upload Resume (PDF or DOCX)
-              </label>
-              <input
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(event) => setFile(event.target.files?.[0] || null)}
-                className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white/80 p-2.5 text-sm shadow-sm outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-300 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
-              />
-              {file ? <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">Selected: {file.name}</p> : null}
+            <div className="group relative overflow-hidden rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50 via-cyan-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-sky-900/60 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/25">
+              <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-sky-300/20 blur-2xl dark:bg-sky-500/15" />
+              <div className="pointer-events-none absolute -bottom-12 -left-12 h-28 w-28 rounded-full bg-cyan-300/20 blur-2xl dark:bg-cyan-500/15" />
+
+              <div className="relative">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-extrabold uppercase tracking-[0.16em] text-sky-900 dark:text-sky-100">Resume Upload</label>
+                  <span className="rounded-full border border-sky-300/70 bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-slate-900/70 dark:text-sky-200">
+                    PDF / DOCX
+                  </span>
+                </div>
+
+                <input
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(event) => setFile(event.target.files?.[0] || null)}
+                  className="w-full cursor-pointer rounded-xl border border-sky-200 bg-white/90 p-3 text-sm text-slate-800 shadow-sm outline-none ring-0 transition file:mr-4 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-2 file:text-xs file:font-bold file:uppercase file:tracking-wide file:text-white hover:file:bg-sky-700 focus:border-sky-500 focus:ring-2 focus:ring-sky-300 dark:border-slate-700 dark:bg-slate-950/45 dark:text-slate-100 dark:file:bg-sky-500 dark:hover:file:bg-sky-400"
+                />
+
+                {file ? (
+                  <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Selected: {file.name}
+                  </p>
+                ) : (
+                  <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-300">Drop your latest resume and we will analyze ATS readiness.</p>
+                )}
+              </div>
             </div>
 
             <div>
