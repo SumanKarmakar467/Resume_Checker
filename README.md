@@ -71,6 +71,7 @@ npm run dev
 
 If you want MongoDB persistence, set `MONGODB_URI` in `.env`.
 If `MONGODB_URI` is empty, backend still runs without database storage.
+Set `ALLOWED_ORIGINS` (comma-separated) to control which frontend origins can call the API.
 
 ## Run Frontend
 
