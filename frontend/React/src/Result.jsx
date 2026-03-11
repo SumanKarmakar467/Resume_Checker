@@ -240,13 +240,40 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          {insightCards.map((card) => (
-            <article key={card.title} className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800/70">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{card.title}</p>
-              <p className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100">{card.value}</p>
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{card.sub}</p>
-            </article>
-          ))}
+          {insightCards.map((card) => {
+            if (card.title === 'Overall ATS Score') {
+              const score = analysis.overallScore || 0;
+              const scoreDeg = Math.round((Math.max(0, Math.min(100, score)) / 100) * 360);
+              return (
+                <article
+                  key={card.title}
+                  className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800/70"
+                >
+                  <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{card.title}</p>
+                  <div
+                    className="mx-auto mt-3 grid h-28 w-28 place-items-center rounded-full"
+                    style={{ background: `conic-gradient(#22c55e ${scoreDeg}deg, #e2e8f0 ${scoreDeg}deg)` }}
+                  >
+                    <div className="grid h-20 w-20 place-items-center rounded-full bg-white dark:bg-slate-900">
+                      <p className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{card.value}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-center text-xs text-slate-600 dark:text-slate-300">{card.sub}</p>
+                </article>
+              );
+            }
+
+            return (
+              <article
+                key={card.title}
+                className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800/70"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{card.title}</p>
+                <p className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100">{card.value}</p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{card.sub}</p>
+              </article>
+            );
+          })}
         </div>
 
         {feedbackView === 'cards' ? (

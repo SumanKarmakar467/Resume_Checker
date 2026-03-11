@@ -1,0 +1,47 @@
+SUMAN KARMAKAR
+MERN Stack Developer | Kolkata, West Bengal, India
+your.email@email.com | +91-XXXXXXXXXX | linkedin.com/in/yourprofile | github.com/yourgithub | yourportfolio.com
+
+PROFESSIONAL SUMMARY
+Final-year B.Tech Computer Science student and MERN Stack Developer with hands-on experience building and deploying full-stack web applications. Proficient in React.js, Node.js, Express.js, and MongoDB with strong Data Structures and Algorithms foundations in Java. Built responsive, performance-focused web products and deployed them with CI/CD workflows. Seeking Software Engineering opportunities to contribute to scalable, user-centric systems.
+
+TECHNICAL SKILLS
+Languages: Java, JavaScript (ES6+), HTML5, CSS3
+Frontend: React.js, Responsive UI Design, Component Architecture
+Backend: Node.js, Express.js, REST API Development
+Database: MongoDB, Mongoose ODM
+Core CS: Data Structures and Algorithms, Object-Oriented Programming
+Tools and Platforms: Git, GitHub, Vercel, GitHub Pages, VS Code
+Spoken Languages: English, Hindi, Bengali
+
+PROJECTS
+LeetCode Metrics Tracker | React.js, REST API, Vercel
+- Built a real-time coding analytics dashboard to fetch and display live LeetCode user statistics through public API integration.
+- Developed responsive React UI with dynamic data rendering, reducing manual progress tracking effort by 100% for competitive programmers.
+- Deployed on Vercel with GitHub-based CI/CD and optimized API request handling for fast load times.
+
+Bella Vista Restaurant Website | HTML5, CSS3, JavaScript, Vercel
+- Developed a fully responsive restaurant website with menu display, business information, and smooth cross-device navigation.
+- Applied modern UI/UX design patterns and structured layouts to improve user flow from landing page to menu exploration.
+- Managed end-to-end deployment workflow using Git and Vercel.
+
+Food Showcase Web App | HTML5, CSS3, JavaScript, Vercel
+- Built a responsive food catalog web app with interactive UI components and structured grid layouts for all screen sizes.
+- Focused on performance and accessibility for seamless browsing across mobile and desktop devices.
+
+Personal Portfolio Website | HTML5, CSS3, JavaScript, GitHub Pages
+- Designed and deployed a modern personal portfolio to showcase projects, technical skills, and profile details.
+- Used semantic HTML and clean UI patterns to improve accessibility and SEO.
+
+EDUCATION
+Greater Kolkata College of Engineering and Management, Kolkata, WB
+Bachelor of Technology in Computer Science and Engineering | Aug 2022 - May 2026
+
+R.B.B. High (H.S) School, West Bengal
+Class XII, WBCHSE | 88.60% | 2021 - 2022
+
+COMPETITIVE PROGRAMMING AND ACHIEVEMENTS
+LeetCode
+- Active problem solver with tracked metrics using a self-built analytics tool.
+- Regularly solve DSA problems in Java across Arrays, Trees, Graphs, Dynamic Programming, and Recursion.
+

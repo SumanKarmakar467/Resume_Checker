@@ -50,11 +50,6 @@ function UploadResume() {
       return;
     }
 
-    if (!jobDescription.trim()) {
-      setError('Please paste the job description for ATS matching.');
-      return;
-    }
-
     setLoading(true);
     setError('');
     setAnalysis(null);
@@ -174,12 +169,12 @@ function UploadResume() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">Job Description</label>
+              <label className="mb-2 block text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">Job Description (Optional)</label>
               <textarea
-                rows="8"
+                rows="2"
                 value={jobDescription}
                 onChange={(event) => setJobDescription(event.target.value)}
-                placeholder="Paste complete job description here..."
+                placeholder="Paste job description for better keyword matching (optional)..."
                 className="w-full rounded-xl border border-slate-300 bg-white/80 p-3 text-slate-900 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-300 dark:border-slate-700 dark:bg-slate-950/35 dark:text-slate-100"
               />
             </div>
