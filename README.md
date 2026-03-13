@@ -1,91 +1,67 @@
-# ATS Resume Checker (MERN)
+# ATS Resume Checker
 
-This project now includes a MERN implementation for ATS resume analysis:
-1. User uploads resume in PDF format.
-2. Node/Express extracts PDF text.
-3. ATS score is calculated section-wise.
-4. Low-score portions are highlighted.
-5. Suggestions are generated.
-6. ATS-friendly resume draft is generated.
-
-## Tech Stack
-
-### Frontend
-- React.js (Vite)
-- Tailwind CSS
-- Axios
-
-### Backend (MERN)
-- Node.js
-- Express.js
-- MongoDB (optional persistence)
-- Mongoose
-- Multer + pdf-parse
+Resume checker website with:
+- React frontend (`UploadResume.jsx`, `Result.jsx`)
+- Spring Boot backend (`Controller`, `Service`, `ResumeParser`)
 
 ## Project Structure
 
-- `frontend/React` -> React frontend app
-- `backend/Node` -> Node + Express ATS API
-- `backend/Spring Boot` -> Older Java version (optional, not required for MERN run)
+```text
+ats-resume-checker
+|
+|-- frontend
+|   |-- React
+|       |-- UploadResume.jsx
+|       |-- Result.jsx
+|
+|-- backend
+|   |-- Spring Boot
+|       |-- src/main/java/com/resumechecker/controller/ResumeController.java
+|       |-- src/main/java/com/resumechecker/service/ResumeAnalysisService.java
+|       |-- src/main/java/com/resumechecker/service/ResumeParser.java
+|
+|-- README.md
+```
 
-## API Endpoints
+## API (Spring Boot)
 
 Base URL: `http://localhost:8080/api/resume`
 
 ### `POST /analyze`
-Form-data:
-- `file` (PDF)
-- `jobDescription` (text)
-
-Returns:
-- `overallScore`
-- `sections[]` (score/status/issues/suggestions)
-- `missingKeywords[]`
-- `suggestions[]`
-- `extractedText`
+- Content-Type: `multipart/form-data`
+- Fields:
+  - `file` (PDF/DOCX/TXT)
+  - `jobDescription` (optional text)
 
 ### `POST /generate-ats`
-JSON:
+- Content-Type: `application/json`
+- Body:
+
 ```json
 {
-  "resumeText": "...",
-  "jobDescription": "..."
+  "resumeText": "....",
+  "jobDescription": "...."
 }
 ```
 
-Returns:
-```json
-{
-  "generatedResume": "..."
-}
-```
-
-## Run MERN Backend
+## Run Backend (Spring Boot)
 
 ```bash
-cd "backend/Node"
-copy .env.example .env
-npm install
-npm run dev
+cd "backend/Spring Boot"
+mvn spring-boot:run
 ```
 
-If you want MongoDB persistence, set `MONGODB_URI` in `.env`.
-If `MONGODB_URI` is empty, backend still runs without database storage.
-Set `ALLOWED_ORIGINS` (comma-separated) to control which frontend origins can call the API.
-
-## Run Frontend
+## Run Frontend (React)
 
 ```bash
 cd "frontend/React"
-copy .env.example .env
 npm install
 npm run dev
 ```
 
 Open: `http://localhost:5173`
 
-## Important
+## Notes
 
-- Do not open `127.0.0.1:5500/index.html` with Live Server.
-- Use Vite URL: `http://localhost:5173`.
-- Current upload support is PDF only.
+- Existing `backend/Node` is still present in the repo but not required for the Spring Boot flow.
+- Frontend calls `/api/resume/analyze` and `/api/resume/generate-ats` which are implemented in the Spring Boot backend.
