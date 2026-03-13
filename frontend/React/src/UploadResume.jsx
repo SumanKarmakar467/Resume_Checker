@@ -27,11 +27,49 @@ const initialBuilderData = {
 
 const templates = [
   {
+    id: 'suman-pdf-style',
+    name: 'Suman PDF Style (Exact)',
+    score: 94,
+    description: 'Closest match to Suman karmakar (2).pdf layout and wording flow.',
+    preview: 'Header -> About Me -> Projects -> Education -> Additional Information',
+    headshot: 'No Headshot',
+    graphics: 'Minimal',
+    columns: 'Single Column',
+    color: 'Green',
+    sampleResume: `SUMAN KARMAKAR
+MERN STACK DEVELOPER & DSA ENTHUSIAST
+GitHub | LinkedIn | Email | Phone
+
+ABOUT ME
+Final-year B.Tech student at GKCEM specializing in CSE with interest in real-world web projects.
+
+PROJECTS
+My Portfolio Website | Demo | Source
+- Built modern responsive portfolio using HTML, CSS, JavaScript.
+
+Bella Vista Restaurant | Demo | Source
+- Built responsive restaurant website with structured UI components.
+
+EDUCATION
+GREATER KOLKATA COLLEGE OF ENGINEERING & MANAGEMENT (2022-2026)
+B.Tech, Computer Science & Engineering
+12th Board - WBCHSE | Percentage - 88.60
+10th Board - WBBSE | Percentage - 70.57
+
+ADDITIONAL INFORMATION
+Technical Skills: Java, DSA, OOPS, HTML, CSS, JavaScript, Nodejs, Expressjs, Reactjs, MongoDB
+Languages: English, Hindi, Bengali`
+  },
+  {
     id: 'clean-pro',
     name: 'Student Pro ATS',
     score: 92,
     description: 'Matches your latest resume style with strong ATS headings.',
     preview: 'Projects-first student layout + clear skills/education',
+    headshot: 'Headshot',
+    graphics: 'Minimal',
+    columns: 'Single Column',
+    color: 'Blue',
     sampleResume: `SUMAN KUMAR
 MERN STACK DEVELOPER | KOLKATA
 Email | Phone | GitHub | LinkedIn
@@ -62,6 +100,10 @@ Languages: English, Hindi, Bengali`
     score: 89,
     description: 'Quantified project bullets for better recruiter impact.',
     preview: 'Achievement-focused bullets with ATS-friendly structure',
+    headshot: 'No Headshot',
+    graphics: 'Modern',
+    columns: 'Two Column',
+    color: 'Navy',
     sampleResume: `SUMAN KUMAR
 MERN STACK DEVELOPER & DSA ENTHUSIAST
 Email | Phone | GitHub | LinkedIn
@@ -94,6 +136,10 @@ B.Tech CSE (2022-2026), GKCEM
     score: 86,
     description: 'Simple fresher resume format inspired by your PDF structure.',
     preview: 'Clean one-page ATS style for internships and fresher roles',
+    headshot: 'No Headshot',
+    graphics: 'Minimal',
+    columns: 'Single Column',
+    color: 'Gray',
     sampleResume: `SUMAN KUMAR | Email | Phone | GitHub | LinkedIn | Kolkata
 
 TARGET ROLE
@@ -188,6 +234,61 @@ function buildDraft(data, jdKeywords, templateName) {
 
   const keys = jdKeywords || 'No JD keywords provided';
 
+  const compactSkills = Object.values(data.skills)
+    .filter(hasText)
+    .join(', ');
+
+  if (templateName === 'Suman PDF Style (Exact)') {
+    const profileLine = [data.github || 'GitHub', data.linkedin || 'linkedIn', data.email || 'Email', data.phone || 'Phone']
+      .filter(hasText)
+      .join('   ');
+
+    const aboutMeText =
+      data.summary ||
+      'I am a final-year B.Tech student specializing in Computer Science & Engineering, passionate about web development and real-world projects.';
+
+    const projectBlocks = data.projects
+      .filter((p) => [p.name, p.description, p.liveLink, p.sourceCode].some(hasText))
+      .map((p) => `${p.name || 'Project Name'}${p.liveLink ? `   ${p.liveLink}` : ''}${p.sourceCode ? `   ${p.sourceCode}` : ''}\n${p.description || 'Project description.'}`);
+
+    const educationLines = [];
+    if ([data.education.graduation.board, data.education.graduation.percentage, data.education.graduation.year].some(hasText)) {
+      educationLines.push(
+        `${data.education.graduation.board || 'Graduation Institute'}${data.education.graduation.year ? `   ${data.education.graduation.year}` : ''}`
+      );
+      if (data.education.graduation.percentage) educationLines.push(`Graduation Percentage - ${data.education.graduation.percentage}`);
+    }
+    if ([data.education.twelfth.board, data.education.twelfth.percentage, data.education.twelfth.year].some(hasText)) {
+      educationLines.push(
+        `12th Board - ${data.education.twelfth.board || 'Board'}${data.education.twelfth.percentage ? `, Percentage - ${data.education.twelfth.percentage}` : ''}${data.education.twelfth.year ? `   ${data.education.twelfth.year}` : ''}`
+      );
+    }
+    if ([data.education.tenth.board, data.education.tenth.percentage, data.education.tenth.year].some(hasText)) {
+      educationLines.push(
+        `10th Board - ${data.education.tenth.board || 'Board'}${data.education.tenth.percentage ? `, Percentage - ${data.education.tenth.percentage}` : ''}${data.education.tenth.year ? `   ${data.education.tenth.year}` : ''}`
+      );
+    }
+
+    return `${(data.fullName || 'SUMAN KARMAKAR').toUpperCase()}
+${(data.targetRole || 'MERN STACK DEVELOPER & DSA ENTHUSIAST').toUpperCase()}
+
+${profileLine}
+
+ABOUT ME
+${aboutMeText}
+
+PROJECTS
+${projectBlocks.length ? projectBlocks.join('\n\n') : 'My Portfolio Website   Demo   Source\nDeveloped a personal portfolio website using HTML, CSS, and JavaScript.'}
+
+EDUCATION
+${educationLines.length ? educationLines.join('\n') : 'GREATER KOLKATA COLLEGE OF ENGINEERING & MANAGEMENT   2022-2026\nBachelor of Technology, Computer Science & Engineering\n12th Board - WBCHSE, Percentage - 88.60\n10th Board - WBBSE, Percentage - 70.57'}
+
+ADDITIONAL INFORMATION
+Technical Skills: ${compactSkills || 'Java, DSA, OOPS, HTML, CSS, JavaScript, Nodejs, Expressjs, Reactjs, MongoDB'}
+Keywords: ${keys}
+`;
+  }
+
   return `${templateName}
 ${data.fullName || 'Your Name'}
 ${contact}
@@ -229,6 +330,12 @@ function UploadResume() {
   const [builderJobDescription, setBuilderJobDescription] = useState('');
   const [builderDraft, setBuilderDraft] = useState('');
   const [builderScore, setBuilderScore] = useState(0);
+  const [templateFilter, setTemplateFilter] = useState({
+    headshot: 'All',
+    graphics: 'All',
+    columns: 'All',
+    color: 'All'
+  });
   const [builderLoading, setBuilderLoading] = useState(false);
   const [builderError, setBuilderError] = useState('');
   const [isDark, setIsDark] = useState(false);
@@ -347,6 +454,17 @@ function UploadResume() {
   };
 
   const selectedTemplateData = templates.find((x) => x.id === selectedTemplate) || templates[0];
+  const filteredTemplates = templates.filter((template) => {
+    const matchHeadshot = templateFilter.headshot === 'All' || template.headshot === templateFilter.headshot;
+    const matchGraphics = templateFilter.graphics === 'All' || template.graphics === templateFilter.graphics;
+    const matchColumns = templateFilter.columns === 'All' || template.columns === templateFilter.columns;
+    const matchColor = templateFilter.color === 'All' || template.color === templateFilter.color;
+    return matchHeadshot && matchGraphics && matchColumns && matchColor;
+  });
+
+  const updateTemplateFilter = (key, value) => {
+    setTemplateFilter((current) => ({ ...current, [key]: value }));
+  };
   const goHome = () => {
     setActiveView('home');
     setBuilderStep('templates');
@@ -524,35 +642,64 @@ function UploadResume() {
 
             {builderStep === 'templates' ? (
               <>
-                <p className="mb-3 text-sm theme-muted">
-                  ATS templates below are now modeled on your resume style (student profile + projects + education + skills).
-                </p>
-                <div className="grid gap-4 md:grid-cols-3">
-                  {templates.map((t) => (
-                    <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTemplate(t.id);
-                      setBuilderStep('form');
-                    }}
-                    className={`text-left rounded-2xl border p-4 transition ${
-                      selectedTemplate === t.id
-                        ? 'border-[var(--accent)] bg-[var(--surface-soft)]'
-                        : 'border-[var(--border-color)] bg-[var(--surface-soft)]'
-                    }`}
-                  >
-                    <p className="text-sm font-bold">{t.name}</p>
-                    <p className="theme-muted mt-1 text-xs">{t.description}</p>
-                    <p className="theme-muted mt-2 text-xs">Random sample: {t.preview}</p>
-                    <p className="theme-accent mt-2 text-xs font-semibold">Template ATS Score: {t.score}/100</p>
-                    <div className="mt-3 rounded-lg border border-[var(--border-color)] bg-[var(--input-bg)] p-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide theme-muted">Generated Resume Sample</p>
-                      <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed theme-muted">
-                        {t.sampleResume}
-                      </pre>
-                    </div>
-                    </button>
+                <h3 className="text-2xl font-extrabold text-center">Templates we recommend for you</h3>
+                <p className="mb-4 mt-2 text-center text-sm theme-muted">You can always change your template later.</p>
+
+                <div className="template-filter-panel">
+                  <div className="template-filter-row">
+                    <span className="text-xs font-bold">Filter by</span>
+                    <select value={templateFilter.headshot} onChange={(e) => updateTemplateFilter('headshot', e.target.value)} className="template-select">
+                      <option>All</option>
+                      <option>Headshot</option>
+                      <option>No Headshot</option>
+                    </select>
+                    <select value={templateFilter.graphics} onChange={(e) => updateTemplateFilter('graphics', e.target.value)} className="template-select">
+                      <option>All</option>
+                      <option>Minimal</option>
+                      <option>Modern</option>
+                    </select>
+                    <select value={templateFilter.columns} onChange={(e) => updateTemplateFilter('columns', e.target.value)} className="template-select">
+                      <option>All</option>
+                      <option>Single Column</option>
+                      <option>Two Column</option>
+                    </select>
+                    <select value={templateFilter.color} onChange={(e) => updateTemplateFilter('color', e.target.value)} className="template-select">
+                      <option>All</option>
+                      <option>Blue</option>
+                      <option>Green</option>
+                      <option>Navy</option>
+                      <option>Gray</option>
+                    </select>
+                  </div>
+                </div>
+
+                <p className="mb-3 mt-4 text-sm theme-muted">All templates ({filteredTemplates.length})</p>
+
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredTemplates.map((t) => (
+                    <article key={t.id} className={`template-showcase-card ${selectedTemplate === t.id ? 'template-showcase-card-selected' : ''}`}>
+                      <div className="template-header-row">
+                        <p className="text-sm font-bold">{t.name}</p>
+                        <span className="recommended-pill">Recommended</span>
+                      </div>
+                      <p className="theme-muted mt-1 text-xs">{t.description}</p>
+                      <p className="theme-accent mt-2 text-xs font-semibold">Template ATS Score: {t.score}/100</p>
+                      <div className="template-preview-paper">
+                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed theme-muted">
+                          {t.sampleResume}
+                        </pre>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplate(t.id);
+                          setBuilderStep('form');
+                        }}
+                        className="template-choose-btn"
+                      >
+                        Choose template
+                      </button>
+                    </article>
                   ))}
                 </div>
               </>
