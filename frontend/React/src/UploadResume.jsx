@@ -618,12 +618,26 @@ function UploadResume() {
               </button>
             </div>
             <form onSubmit={handleAnalyze} className="space-y-5">
-              <input
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="theme-input w-full cursor-pointer rounded-xl p-3 text-sm"
-              />
+              <div className="file-input-shell">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold">Upload Resume</p>
+                    <p className="theme-muted text-xs">PDF or DOCX</p>
+                  </div>
+                  <label className="theme-button-primary cursor-pointer rounded-xl px-4 py-2 text-xs font-bold text-white">
+                    Choose File
+                    <input
+                      type="file"
+                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className={`mt-3 rounded-lg px-3 py-2 text-sm ${file ? 'file-picked' : 'file-not-picked'}`}>
+                  {file ? `Selected file: ${file.name}` : 'No file selected yet'}
+                </div>
+              </div>
               <textarea
                 rows="3"
                 value={checkerJobDescription}

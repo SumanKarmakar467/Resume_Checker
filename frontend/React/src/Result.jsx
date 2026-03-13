@@ -26,7 +26,7 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
             <h2 className="text-2xl font-extrabold">ATS Score Report</h2>
             <p className="theme-muted mt-1 text-sm">{shortlistMessage(overallScore)}</p>
           </div>
-          <div className={`rounded-xl px-4 py-2 text-lg font-extrabold ${scoreBadgeClass(overallScore)}`}>{overallScore}/100</div>
+          <div className={`ats-score-circle text-lg font-extrabold ${scoreBadgeClass(overallScore)}`}>{overallScore}/100</div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">

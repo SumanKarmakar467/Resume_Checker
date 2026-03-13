@@ -148,6 +148,18 @@ html {
   color: var(--score-text);
 }
 
+.ats-score-circle {
+  width: 6.6rem;
+  height: 6.6rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
+  border: 2px solid rgba(15, 23, 42, 0.08);
+}
+
 .badge-strong {
   background: #dcfce7;
   color: #166534;
@@ -516,6 +528,26 @@ html {
 .template-choose-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 24px rgba(47, 84, 235, 0.28);
+}
+
+.file-input-shell {
+  border: 1px dashed #9fb2dd;
+  border-radius: 0.95rem;
+  background: #f8faff;
+  padding: 0.85rem;
+}
+
+.file-picked {
+  background: #e9fbe8;
+  color: #0f6a2c;
+  border: 1px solid #b7e5b4;
+  font-weight: 700;
+}
+
+.file-not-picked {
+  background: #f2f4f8;
+  color: #566070;
+  border: 1px solid #d5dbe6;
 }
 
 @keyframes drift {
