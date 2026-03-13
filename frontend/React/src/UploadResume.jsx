@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
 import Result from './Result';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/resume';
@@ -441,7 +442,11 @@ function UploadResume() {
   const [builderData, setBuilderData] = useState(initialBuilderData);
   const [builderJobDescription, setBuilderJobDescription] = useState('');
   const [builderDraft, setBuilderDraft] = useState('');
+  const [pdfFileName, setPdfFileName] = useState('resume-rating-draft');
   const [builderScore, setBuilderScore] = useState(0);
+  const [templateStyleMode, setTemplateStyleMode] = useState('all');
+  const [templatePreviewMode, setTemplatePreviewMode] = useState('thumbnail');
+  const [templateCountMode, setTemplateCountMode] = useState('all');
   const [templateFilter, setTemplateFilter] = useState({
     headshot: 'All',
     graphics: 'All',
@@ -565,14 +570,50 @@ function UploadResume() {
     }
   };
 
+  const downloadBuilderPdf = () => {
+    if (!builderDraft.trim()) {
+      setBuilderError('Build your resume draft first before downloading PDF.');
+      return;
+    }
+
+    const fileName = (pdfFileName || 'resume-rating-draft').trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const marginX = 44;
+    const marginY = 52;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - marginX * 2;
+    const lineHeight = 16;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+
+    const lines = doc.splitTextToSize(builderDraft, maxWidth);
+    let y = marginY;
+    lines.forEach((line) => {
+      if (y > pageHeight - marginY) {
+        doc.addPage();
+        y = marginY;
+      }
+      doc.text(line, marginX, y);
+      y += lineHeight;
+    });
+
+    doc.save(`${fileName}.pdf`);
+  };
+
   const selectedTemplateData = templates.find((x) => x.id === selectedTemplate) || templates[0];
   const filteredTemplates = templates.filter((template) => {
+    const currentStyle = template.id.includes('.pdf-template') ? 'exact' : 'modern';
+    const matchStyle = templateStyleMode === 'all' || currentStyle === templateStyleMode;
     const matchHeadshot = templateFilter.headshot === 'All' || template.headshot === templateFilter.headshot;
     const matchGraphics = templateFilter.graphics === 'All' || template.graphics === templateFilter.graphics;
     const matchColumns = templateFilter.columns === 'All' || template.columns === templateFilter.columns;
     const matchColor = templateFilter.color === 'All' || template.color === templateFilter.color;
-    return matchHeadshot && matchGraphics && matchColumns && matchColor;
+    return matchStyle && matchHeadshot && matchGraphics && matchColumns && matchColor;
   });
+  const visibleTemplates =
+    templateCountMode === 'all' ? filteredTemplates : filteredTemplates.slice(0, Number(templateCountMode));
 
   const updateTemplateFilter = (key, value) => {
     setTemplateFilter((current) => ({ ...current, [key]: value }));
@@ -799,6 +840,11 @@ function UploadResume() {
                 <div className="template-filter-panel">
                   <div className="template-filter-row">
                     <span className="text-xs font-bold">Filter by</span>
+                    <select value={templateStyleMode} onChange={(e) => setTemplateStyleMode(e.target.value)} className="template-select">
+                      <option value="all">All Styles</option>
+                      <option value="exact">Exact PDF Style</option>
+                      <option value="modern">Modern ATS Style</option>
+                    </select>
                     <select value={templateFilter.headshot} onChange={(e) => updateTemplateFilter('headshot', e.target.value)} className="template-select">
                       <option>All</option>
                       <option>Headshot</option>
@@ -821,13 +867,24 @@ function UploadResume() {
                       <option>Navy</option>
                       <option>Gray</option>
                     </select>
+                    <select value={templatePreviewMode} onChange={(e) => setTemplatePreviewMode(e.target.value)} className="template-select">
+                      <option value="thumbnail">Image-like Preview</option>
+                      <option value="text">Text Preview</option>
+                    </select>
+                    <select value={templateCountMode} onChange={(e) => setTemplateCountMode(e.target.value)} className="template-select">
+                      <option value="all">Show All</option>
+                      <option value="3">Show 3</option>
+                      <option value="5">Show 5</option>
+                    </select>
                   </div>
                 </div>
 
-                <p className="mb-3 mt-4 text-sm theme-muted">All templates ({filteredTemplates.length})</p>
+                <p className="mb-3 mt-4 text-sm theme-muted">
+                  Templates showing ({visibleTemplates.length}) of filtered ({filteredTemplates.length}) | Contact line supports plain text + icon hyperlink modes.
+                </p>
 
                 <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredTemplates.map((t) => (
+                  {visibleTemplates.map((t) => (
                     <article key={t.id} className={`template-showcase-card ${selectedTemplate === t.id ? 'template-showcase-card-selected' : ''}`}>
                       <div className="template-header-row">
                         <p className="text-sm font-bold">{t.name}</p>
@@ -836,9 +893,40 @@ function UploadResume() {
                       <p className="theme-muted mt-1 text-xs">{t.description}</p>
                       <p className="theme-accent mt-2 text-xs font-semibold">Template ATS Score: {t.score}/100</p>
                       <div className="template-preview-paper">
-                        <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed theme-muted">
-                          {t.sampleResume}
-                        </pre>
+                        {templatePreviewMode === 'text' ? (
+                          <pre className="max-h-56 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed theme-muted">
+                            {t.sampleResume}
+                          </pre>
+                        ) : (
+                          <div className="template-thumbnail">
+                            <div className="thumb-paper">
+                              <div className="thumb-name-line" title={t.sampleResume.split('\n')[0] || 'Resume Name'} />
+                              <div className="thumb-role-line" title={t.sampleResume.split('\n')[1] || 'Role'} />
+                              <div className="thumb-contact-row">
+                                <span className="thumb-dot" />
+                                <span className="thumb-dot" />
+                                <span className="thumb-dot" />
+                                <span className="thumb-dot" />
+                              </div>
+                              <div className="thumb-section">
+                                <div className="thumb-section-title" />
+                                <div className="thumb-line" style={{ width: '92%' }} />
+                                <div className="thumb-line" style={{ width: '78%' }} />
+                              </div>
+                              <div className="thumb-section">
+                                <div className="thumb-section-title" />
+                                <div className="thumb-line" style={{ width: '88%' }} />
+                                <div className="thumb-line" style={{ width: '82%' }} />
+                                <div className="thumb-line" style={{ width: '70%' }} />
+                              </div>
+                              <div className="thumb-section">
+                                <div className="thumb-section-title" />
+                                <div className="thumb-line" style={{ width: '86%' }} />
+                                <div className="thumb-line" style={{ width: '62%' }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <button
                         type="button"
@@ -1188,6 +1276,21 @@ function UploadResume() {
                   className="theme-input mt-4 w-full rounded-xl p-3 font-mono text-sm"
                   placeholder="Generated resume draft."
                 />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <input
+                    value={pdfFileName}
+                    onChange={(e) => setPdfFileName(e.target.value)}
+                    placeholder="PDF file name"
+                    className="theme-input rounded-xl px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={downloadBuilderPdf}
+                    className="theme-button-primary rounded-xl px-4 py-2 text-sm font-bold text-white"
+                  >
+                    Download PDF
+                  </button>
+                </div>
               </>
             )}
           </section>

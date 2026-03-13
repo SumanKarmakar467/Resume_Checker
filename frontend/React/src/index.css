@@ -527,6 +527,79 @@ html {
   min-height: 12rem;
 }
 
+.template-thumbnail {
+  min-height: 12rem;
+  border-radius: 0.45rem;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f9fe 100%);
+  border: 1px solid #e6ebf4;
+  padding: 0.65rem;
+}
+
+.thumb-line {
+  height: 0.3rem;
+  border-radius: 999px;
+  background: #cfd8ea;
+  margin-bottom: 0.35rem;
+}
+
+.thumb-line-title {
+  height: 0.5rem;
+  background: #99acd7;
+}
+
+.thumb-line-sub {
+  background: #b7c6e4;
+}
+
+.thumb-paper {
+  border: 1px solid #d7deeb;
+  border-radius: 0.4rem;
+  background: #ffffff;
+  padding: 0.5rem;
+  min-height: 11rem;
+}
+
+.thumb-name-line {
+  width: 76%;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #7f96c9;
+  margin-bottom: 0.38rem;
+}
+
+.thumb-role-line {
+  width: 62%;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: #a3b4d6;
+  margin-bottom: 0.5rem;
+}
+
+.thumb-contact-row {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.45rem;
+}
+
+.thumb-dot {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: #8ea1cd;
+}
+
+.thumb-section {
+  margin-bottom: 0.45rem;
+}
+
+.thumb-section-title {
+  width: 34%;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: #7b8fbd;
+  margin-bottom: 0.25rem;
+}
+
 .template-choose-btn {
   width: 100%;
   margin-top: 0.75rem;
