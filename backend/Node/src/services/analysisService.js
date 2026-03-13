@@ -187,9 +187,9 @@ function scoreKeywordMatch(normalizedResume, keywords) {
   const matchedKeywords = [];
 
   if (keywords.length === 0) {
-    issues.push('Job description keywords were not provided.');
-    suggestions.push('Paste the job description to get more accurate ATS matching.');
-    return { feedback: buildFeedback('Keyword Match', 0, issues, suggestions), missingKeywords, matchedKeywords };
+    issues.push('Job description was not provided, so keyword alignment is estimated.');
+    suggestions.push('Add the job description for role-specific keyword matching.');
+    return { feedback: buildFeedback('Keyword Match', 70, issues, suggestions), missingKeywords, matchedKeywords };
   }
 
   let matched = 0;
