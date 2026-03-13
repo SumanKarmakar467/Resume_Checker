@@ -169,6 +169,58 @@ Skills: React, Node.js, Express.js, MongoDB, Java, DSA, OOP
 Languages: English, Hindi, Bengali`
   },
   {
+    id: 'photo-premium-1',
+    name: 'Photo Premium ATS',
+    score: 91,
+    description: 'Modern ATS template with headshot section and compact summary.',
+    preview: 'Photo + two-column highlights + project impact',
+    headshot: 'Headshot',
+    graphics: 'Modern',
+    columns: 'Two Column',
+    color: 'Blue',
+    sampleResume: `SUMAN KARMAKAR
+MERN STACK DEVELOPER | KOLKATA
+[PHOTO] | Email | Phone | LinkedIn | GitHub
+
+SUMMARY
+Final-year B.Tech CSE student focused on MERN products and DSA.
+
+PROJECTS
+LeetCode Metrics Tracker | Demo | Source
+Portfolio Website | Live | Source
+
+SKILLS
+React, Node.js, Express.js, MongoDB, Java, DSA
+EDUCATION
+GKCEM (2022-2026), 12th-88.60, 10th-70.57`
+  },
+  {
+    id: 'photo-premium-2',
+    name: 'Executive Photo ATS',
+    score: 90,
+    description: 'Photo-ready ATS template for profiles needing visual identity.',
+    preview: 'Headshot card + recruiter-facing summary + clear sections',
+    headshot: 'Headshot',
+    graphics: 'Minimal',
+    columns: 'Single Column',
+    color: 'Navy',
+    sampleResume: `SUMAN KARMAKAR
+SOFTWARE DEVELOPER | RESUME RATING TEMPLATE
+[PHOTO] | Email | Phone | LinkedIn | GitHub
+
+ABOUT ME
+Hands-on full stack developer with project deployment experience.
+
+EXPERIENCE / PROJECTS
+Food Project, Bella Vista, Portfolio, LeetCode Metrics
+
+EDUCATION
+B.Tech CSE (2022-2026) | WBCHSE 88.60 | WBBSE 70.57
+
+SKILLS
+Frontend, Backend, Database, AI Tools, Code Editor`
+  },
+  {
     id: 'impact-first',
     name: 'Impact MERN ATS',
     score: 89,
@@ -643,12 +695,9 @@ function UploadResume() {
             </div>
           </div>
           <div className="landing-nav-actions">
-            {activeView === 'home' ? (
-              <>
-                <button type="button" className="text-sm font-semibold theme-muted">Contact Us</button>
-                <button type="button" className="text-sm font-semibold theme-muted">Login</button>
-              </>
-            ) : null}
+            <button type="button" onClick={goHome} className={`nav-pill ${activeView === 'home' ? 'nav-pill-active' : ''}`}>Home</button>
+            <button type="button" onClick={() => setActiveView('checker')} className={`nav-pill ${activeView === 'checker' ? 'nav-pill-active' : ''}`}>ATS Checker</button>
+            <button type="button" onClick={openBuilder} className={`nav-pill ${activeView === 'builder' ? 'nav-pill-active' : ''}`}>Resume Builder</button>
             <button type="button" onClick={toggleTheme} className="theme-toggle rounded-full px-4 py-2 text-sm font-semibold">
               {isDark ? 'Light Mode' : 'Dark Mode'}
             </button>
@@ -806,6 +855,20 @@ function UploadResume() {
               >
                 {loading ? 'Analyzing...' : 'Check ATS Score'}
               </button>
+              {loading ? (
+                <div className="ats-loading-card">
+                  <div className="scan-orb" />
+                  <div>
+                    <p className="text-sm font-bold">Scanning Resume For ATS Signals...</p>
+                    <p className="theme-muted text-xs">Checking keywords, section quality, and formatting compatibility.</p>
+                    <div className="loading-bars mt-2">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </form>
             {analysis ? (
               <Result
@@ -900,6 +963,7 @@ function UploadResume() {
                         ) : (
                           <div className="template-thumbnail">
                             <div className="thumb-paper">
+                              {t.headshot === 'Headshot' ? <div className="thumb-photo-block" /> : null}
                               <div className="thumb-name-line" title={t.sampleResume.split('\n')[0] || 'Resume Name'} />
                               <div className="thumb-role-line" title={t.sampleResume.split('\n')[1] || 'Role'} />
                               <div className="thumb-contact-row">

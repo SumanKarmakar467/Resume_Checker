@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 function scoreBadgeClass(score) {
   if (score >= 80) return 'score-ring-strong';
   if (score >= 60) return 'score-ring-medium';
@@ -11,6 +13,7 @@ function shortlistMessage(score) {
 }
 
 function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) {
+  const [canvaStyle, setCanvaStyle] = useState('classic');
   const sections = analysis?.sections || [];
   const strongSections = sections.filter((section) => (section.score || 0) >= 80);
   const weakSections = sections.filter((section) => (section.score || 0) < 70);
@@ -100,6 +103,17 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
           >
             {loading ? 'Generating...' : 'Generate ATS Draft'}
           </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => setCanvaStyle('classic')} className={`canva-chip ${canvaStyle === 'classic' ? 'canva-chip-active' : ''}`}>Classic</button>
+          <button type="button" onClick={() => setCanvaStyle('modern')} className={`canva-chip ${canvaStyle === 'modern' ? 'canva-chip-active' : ''}`}>Modern</button>
+          <button type="button" onClick={() => setCanvaStyle('executive')} className={`canva-chip ${canvaStyle === 'executive' ? 'canva-chip-active' : ''}`}>Executive</button>
+        </div>
+
+        <div className={`canva-draft-preview canva-${canvaStyle}`}>
+          <div className="canva-preview-header" />
+          <pre className="canva-preview-text">{resumeDraft || 'Your ATS draft preview will appear here after generating.'}</pre>
         </div>
 
         <textarea
