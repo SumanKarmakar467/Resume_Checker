@@ -149,6 +149,9 @@ html {
 }
 
 .ats-score-circle {
+  --score-value: 0;
+  --ring-color: #f59e0b;
+  --ring-track: #e4e8ef;
   width: 6.6rem;
   height: 6.6rem;
   border-radius: 999px;
@@ -157,36 +160,48 @@ html {
   justify-content: center;
   text-align: center;
   line-height: 1;
-  border: 2px solid rgba(15, 23, 42, 0.08);
+  position: relative;
+  background: conic-gradient(var(--ring-color) calc(var(--score-value) * 1%), var(--ring-track) 0);
 }
 
-.badge-strong {
-  background: #dcfce7;
+.ats-score-circle::before {
+  content: '';
+  position: absolute;
+  inset: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+}
+
+.ats-score-circle span {
+  position: relative;
+  z-index: 1;
+}
+
+.score-ring-strong {
+  --ring-color: #22c55e;
   color: #166534;
 }
 
-.badge-medium {
-  background: #fef9c3;
+.score-ring-medium {
+  --ring-color: #f59e0b;
   color: #854d0e;
 }
 
-.badge-weak {
-  background: #ffe4e6;
+.score-ring-weak {
+  --ring-color: #ef4444;
   color: #9f1239;
 }
 
-:root.dark .badge-strong {
-  background: rgba(6, 95, 70, 0.35);
+:root.dark .score-ring-strong {
   color: #a7f3d0;
 }
 
-:root.dark .badge-medium {
-  background: rgba(133, 77, 14, 0.34);
+:root.dark .score-ring-medium {
   color: #fde68a;
 }
 
-:root.dark .badge-weak {
-  background: rgba(136, 19, 55, 0.35);
+:root.dark .score-ring-weak {
   color: #fecdd3;
 }
 

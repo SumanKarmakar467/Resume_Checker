@@ -5,6 +5,7 @@ import Result from './Result';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/resume';
 
 const emptyProject = () => ({ name: '', description: '', liveLink: '', sourceCode: '' });
+const emptyEducation = () => ({ level: '10th', board: '', percentage: '', year: '' });
 
 const initialBuilderData = {
   fullName: '',
@@ -14,24 +15,27 @@ const initialBuilderData = {
   location: '',
   linkedin: '',
   targetRole: '',
+  useContactIcons: false,
+  contactIconLinks: {
+    email: '',
+    phone: '',
+    linkedin: '',
+    github: ''
+  },
   summary: '',
   experience: '',
   projects: [emptyProject()],
-  education: {
-    tenth: { board: '', percentage: '', year: '' },
-    twelfth: { board: '', percentage: '', year: '' },
-    graduation: { board: '', percentage: '', year: '' }
-  },
+  education: [emptyEducation()],
   skills: { frontend: '', backend: '', database: '', codeEditor: '', aiTools: '' }
 };
 
 const templates = [
   {
-    id: 'suman-pdf-style',
-    name: 'Suman PDF Style (Exact)',
+    id: 'suman-resume-pdf-template',
+    name: 'suman_resume.pdf Template',
     score: 94,
-    description: 'Closest match to Suman karmakar (2).pdf layout and wording flow.',
-    preview: 'Header -> About Me -> Projects -> Education -> Additional Information',
+    description: 'Generated from uploaded file: suman_resume.pdf',
+    preview: 'MERN + projects + ATS-friendly section flow',
     headshot: 'No Headshot',
     graphics: 'Minimal',
     columns: 'Single Column',
@@ -58,6 +62,75 @@ B.Tech, Computer Science & Engineering
 
 ADDITIONAL INFORMATION
 Technical Skills: Java, DSA, OOPS, HTML, CSS, JavaScript, Nodejs, Expressjs, Reactjs, MongoDB
+Languages: English, Hindi, Bengali`
+  },
+  {
+    id: 'suman-karmakar-2-pdf-template',
+    name: 'Suman karmakar (2).pdf Template',
+    score: 93,
+    description: 'Generated from uploaded file: Suman karmakar (2).pdf',
+    preview: 'About me + projects-first + education + additional info',
+    headshot: 'No Headshot',
+    graphics: 'Modern',
+    columns: 'Single Column',
+    color: 'Blue',
+    sampleResume: `SUMAN KARMAKAR
+MERN STACK DEVELOPER & DSA ENTHUSIAST
+GitHub | LinkedIn | Email | Phone
+
+ABOUT ME
+Final-year B.Tech CSE student passionate about web development and practical projects.
+
+PROJECTS
+My Portfolio Website | Demo | Source
+- Built responsive personal portfolio to showcase skills and projects.
+
+My Food Project | Demo | Source
+- Developed responsive food website with interactive UI components.
+
+Bella Vista Restaurant | Demo | Source
+- Built restaurant website with modern UI and structured sections.
+
+EDUCATION
+GREATER KOLKATA COLLEGE OF ENGINEERING & MANAGEMENT (2022-2026)
+Bachelor of Technology, Computer Science & Engineering
+12th Board - WBCHSE, Percentage - 88.60
+10th Board - WBBSE, Percentage - 70.57
+
+ADDITIONAL INFORMATION
+Technical Skills: Java, DSA, OOPS, HTML, CSS, JavaScript, Nodejs, Expressjs, Reactjs, MongoDB
+Languages: English, Hindi, Bengali`
+  },
+  {
+    id: 'suman-karmakar-1-pdf-template',
+    name: 'Suman karmakar (1).pdf Template',
+    score: 92,
+    description: 'Generated from uploaded file: Suman karmakar (1).pdf',
+    preview: 'Student resume format with recruiter-friendly headings',
+    headshot: 'No Headshot',
+    graphics: 'Minimal',
+    columns: 'Single Column',
+    color: 'Navy',
+    sampleResume: `SUMAN KARMAKAR
+MERN STACK DEVELOPER & DSA ENTHUSIAST
+GitHub | LinkedIn | Email | Phone
+
+ABOUT ME
+Final-year CSE student with strong interest in MERN development and DSA.
+
+PROJECTS
+Portfolio Website | Demo | Source
+Food Project | Demo | Source
+Bella Vista Restaurant | Demo | Source
+Leet Code Metrics | Demo | Source
+
+EDUCATION
+GKCEM - B.Tech CSE (2022-2026)
+12th WBCHSE - 88.60
+10th WBBSE - 70.57
+
+ADDITIONAL INFORMATION
+Skills: Java, DSA, OOPS, HTML, CSS, JavaScript, Nodejs, Expressjs, Reactjs, MongoDB
 Languages: English, Hindi, Bengali`
   },
   {
@@ -189,9 +262,58 @@ const scoreDraft = (draft, jd) => {
 };
 
 function buildDraft(data, jdKeywords, templateName) {
+  const ensureUrl = (value) => {
+    if (!value) return '';
+    return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  };
+
+  const contactItems = [];
+  if (hasText(data.email)) {
+    contactItems.push({
+      label: data.email.trim(),
+      href: `mailto:${data.email.trim()}`,
+      symbol: '✉',
+      icon: data.contactIconLinks?.email || ''
+    });
+  }
+  if (hasText(data.phone)) {
+    contactItems.push({
+      label: data.phone.trim(),
+      href: `tel:${data.phone.trim()}`,
+      symbol: '☎',
+      icon: data.contactIconLinks?.phone || ''
+    });
+  }
+  if (hasText(data.linkedin)) {
+    contactItems.push({
+      label: data.linkedin.trim(),
+      href: ensureUrl(data.linkedin.trim()),
+      symbol: 'in',
+      icon: data.contactIconLinks?.linkedin || ''
+    });
+  }
+  if (hasText(data.github)) {
+    contactItems.push({
+      label: data.github.trim(),
+      href: ensureUrl(data.github.trim()),
+      symbol: 'GH',
+      icon: data.contactIconLinks?.github || ''
+    });
+  }
+
+  const contactWithIcons = contactItems
+    .map((item) => {
+      const iconMarkup = hasText(item.icon)
+        ? `<img src="${item.icon}" alt="${item.symbol}" width="14" height="14" />`
+        : item.symbol;
+      return `<a href="${item.href}" target="_blank" rel="noopener noreferrer">${iconMarkup} ${item.label}</a>`;
+    })
+    .join(' | ');
+
   const contact =
     [data.email, data.phone, data.location, data.linkedin, data.github].filter((x) => hasText(x)).join(' | ') ||
     'yourmail@example.com | +1 000 000 0000';
+  const finalContactLine = data.useContactIcons ? contactWithIcons || contact : contact;
 
   const skills =
     Object.entries({
@@ -215,13 +337,9 @@ function buildDraft(data, jdKeywords, templateName) {
       .join('\n') || '- Projects are optional';
 
   const education =
-    [
-      ['10th', data.education.tenth],
-      ['12th', data.education.twelfth],
-      ['Graduation', data.education.graduation]
-    ]
-      .filter(([, e]) => [e.board, e.percentage, e.year].some(hasText))
-      .map(([k, e]) => `- ${k}: ${e.board || 'Board'} | ${e.percentage || 'Percentage'} | ${e.year || 'Year'}`)
+    (data.education || [])
+      .filter((e) => [e.level, e.board, e.percentage, e.year].some(hasText))
+      .map((e) => `- ${e.level || 'UG'}: ${e.board || 'Board'} | ${e.percentage || 'Percentage'} | ${e.year || 'Year'}`)
       .join('\n') || '- Education is optional';
 
   const exp = hasText(data.experience)
@@ -238,10 +356,15 @@ function buildDraft(data, jdKeywords, templateName) {
     .filter(hasText)
     .join(', ');
 
-  if (templateName === 'Suman PDF Style (Exact)') {
-    const profileLine = [data.github || 'GitHub', data.linkedin || 'linkedIn', data.email || 'Email', data.phone || 'Phone']
-      .filter(hasText)
-      .join('   ');
+  if (templateName.includes('.pdf Template') || templateName === 'Suman PDF Style (Exact)') {
+    const profileLine = data.useContactIcons
+      ? contactWithIcons ||
+        [data.github || 'GitHub', data.linkedin || 'linkedIn', data.email || 'Email', data.phone || 'Phone']
+          .filter(hasText)
+          .join('   ')
+      : [data.github || 'GitHub', data.linkedin || 'linkedIn', data.email || 'Email', data.phone || 'Phone']
+          .filter(hasText)
+          .join('   ');
 
     const aboutMeText =
       data.summary ||
@@ -251,23 +374,12 @@ function buildDraft(data, jdKeywords, templateName) {
       .filter((p) => [p.name, p.description, p.liveLink, p.sourceCode].some(hasText))
       .map((p) => `${p.name || 'Project Name'}${p.liveLink ? `   ${p.liveLink}` : ''}${p.sourceCode ? `   ${p.sourceCode}` : ''}\n${p.description || 'Project description.'}`);
 
-    const educationLines = [];
-    if ([data.education.graduation.board, data.education.graduation.percentage, data.education.graduation.year].some(hasText)) {
-      educationLines.push(
-        `${data.education.graduation.board || 'Graduation Institute'}${data.education.graduation.year ? `   ${data.education.graduation.year}` : ''}`
+    const educationLines = (data.education || [])
+      .filter((e) => [e.level, e.board, e.percentage, e.year].some(hasText))
+      .map(
+        (e) =>
+          `${e.level || 'UG'} - ${e.board || 'Board'}${e.percentage ? `, Percentage - ${e.percentage}` : ''}${e.year ? `   ${e.year}` : ''}`
       );
-      if (data.education.graduation.percentage) educationLines.push(`Graduation Percentage - ${data.education.graduation.percentage}`);
-    }
-    if ([data.education.twelfth.board, data.education.twelfth.percentage, data.education.twelfth.year].some(hasText)) {
-      educationLines.push(
-        `12th Board - ${data.education.twelfth.board || 'Board'}${data.education.twelfth.percentage ? `, Percentage - ${data.education.twelfth.percentage}` : ''}${data.education.twelfth.year ? `   ${data.education.twelfth.year}` : ''}`
-      );
-    }
-    if ([data.education.tenth.board, data.education.tenth.percentage, data.education.tenth.year].some(hasText)) {
-      educationLines.push(
-        `10th Board - ${data.education.tenth.board || 'Board'}${data.education.tenth.percentage ? `, Percentage - ${data.education.tenth.percentage}` : ''}${data.education.tenth.year ? `   ${data.education.tenth.year}` : ''}`
-      );
-    }
 
     return `${(data.fullName || 'SUMAN KARMAKAR').toUpperCase()}
 ${(data.targetRole || 'MERN STACK DEVELOPER & DSA ENTHUSIAST').toUpperCase()}
@@ -291,7 +403,7 @@ Keywords: ${keys}
 
   return `${templateName}
 ${data.fullName || 'Your Name'}
-${contact}
+${finalContactLine}
 
 TARGET ROLE
 ${data.targetRole || 'Optional'}
@@ -486,7 +598,7 @@ function UploadResume() {
             <span className="brand-icon" />
             <div className="leading-tight">
               <p className="text-2xl font-extrabold">Resume</p>
-              <p className="-mt-1 text-2xl font-extrabold">Studio</p>
+              <p className="-mt-1 text-2xl font-extrabold">Rating</p>
             </div>
           </div>
           <div className="landing-nav-actions">
@@ -794,6 +906,64 @@ function UploadResume() {
                     placeholder="Target Role (Optional)"
                     className="theme-input rounded-xl px-3 py-2 text-sm"
                   />
+                  <div className="md:col-span-2 rounded-xl border border-[var(--border-color)] p-3">
+                    <label className="flex items-center gap-2 text-sm font-semibold">
+                      <input
+                        type="checkbox"
+                        checked={builderData.useContactIcons}
+                        onChange={(e) => updateTop('useContactIcons', e.target.checked)}
+                      />
+                      Use icons + hyperlink format for Email, Phone, LinkedIn, GitHub
+                    </label>
+                    {builderData.useContactIcons ? (
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        <input
+                          value={builderData.contactIconLinks.email}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              contactIconLinks: { ...c.contactIconLinks, email: e.target.value }
+                            }))
+                          }
+                          placeholder="Email Icon Image URL (Optional)"
+                          className="theme-input rounded-xl px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={builderData.contactIconLinks.phone}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              contactIconLinks: { ...c.contactIconLinks, phone: e.target.value }
+                            }))
+                          }
+                          placeholder="Phone Icon Image URL (Optional)"
+                          className="theme-input rounded-xl px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={builderData.contactIconLinks.linkedin}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              contactIconLinks: { ...c.contactIconLinks, linkedin: e.target.value }
+                            }))
+                          }
+                          placeholder="LinkedIn Icon Image URL (Optional)"
+                          className="theme-input rounded-xl px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={builderData.contactIconLinks.github}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              contactIconLinks: { ...c.contactIconLinks, github: e.target.value }
+                            }))
+                          }
+                          placeholder="GitHub Icon Image URL (Optional)"
+                          className="theme-input rounded-xl px-3 py-2 text-sm"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                   <textarea
                     rows="3"
                     value={builderData.summary}
@@ -860,29 +1030,84 @@ function UploadResume() {
                     ))}
                   </div>
 
-                  <div className="md:col-span-2 grid gap-3 md:grid-cols-3">
-                    {[
-                      ['tenth', '10th'],
-                      ['twelfth', '12th'],
-                      ['graduation', 'Graduation']
-                    ].map(([lvl, label]) => (
-                      <div key={lvl} className="rounded-xl border border-[var(--border-color)] p-3">
-                        <p className="mb-2 text-xs font-semibold">{label}</p>
+                  <div className="md:col-span-2">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-semibold">Education Section</p>
+                      <button
+                        type="button"
+                        onClick={() => setBuilderData((c) => ({ ...c, education: [...c.education, emptyEducation()] }))}
+                        className="theme-button-secondary rounded-xl px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Add Education
+                      </button>
+                    </div>
+                    {builderData.education.map((edu, i) => (
+                      <div key={i} className="mb-2 rounded-xl border border-[var(--border-color)] p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs font-semibold">Education {i + 1}</p>
+                          {builderData.education.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setBuilderData((c) => ({
+                                  ...c,
+                                  education: c.education.filter((_, idx) => idx !== i)
+                                }))
+                              }
+                              className="theme-button-secondary rounded-lg px-2 py-1 text-xs font-semibold"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
                         <input
-                          value={builderData.education[lvl].board}
-                          onChange={(e) => updateEducation(lvl, 'board', e.target.value)}
+                          value={edu.level}
+                          list={`education-level-options-${i}`}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              education: c.education.map((item, idx) => (idx === i ? { ...item, level: e.target.value } : item))
+                            }))
+                          }
+                          placeholder="Education Level (10th / 12th / UG / PG or custom)"
+                          className="theme-input mb-2 w-full rounded-xl px-3 py-2 text-sm"
+                        />
+                        <datalist id={`education-level-options-${i}`}>
+                          <option value="10th" />
+                          <option value="12th" />
+                          <option value="UG" />
+                          <option value="PG" />
+                        </datalist>
+                        <input
+                          value={edu.board}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              education: c.education.map((item, idx) => (idx === i ? { ...item, board: e.target.value } : item))
+                            }))
+                          }
                           placeholder="Board Name"
                           className="theme-input mb-2 w-full rounded-xl px-3 py-2 text-sm"
                         />
                         <input
-                          value={builderData.education[lvl].percentage}
-                          onChange={(e) => updateEducation(lvl, 'percentage', e.target.value)}
+                          value={edu.percentage}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              education: c.education.map((item, idx) => (idx === i ? { ...item, percentage: e.target.value } : item))
+                            }))
+                          }
                           placeholder="Percentage"
                           className="theme-input mb-2 w-full rounded-xl px-3 py-2 text-sm"
                         />
                         <input
-                          value={builderData.education[lvl].year}
-                          onChange={(e) => updateEducation(lvl, 'year', e.target.value)}
+                          value={edu.year}
+                          onChange={(e) =>
+                            setBuilderData((c) => ({
+                              ...c,
+                              education: c.education.map((item, idx) => (idx === i ? { ...item, year: e.target.value } : item))
+                            }))
+                          }
                           placeholder="Year"
                           className="theme-input w-full rounded-xl px-3 py-2 text-sm"
                         />
@@ -890,37 +1115,40 @@ function UploadResume() {
                     ))}
                   </div>
 
-                  <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
-                    <input
-                      value={builderData.skills.frontend}
-                      onChange={(e) => updateSkill('frontend', e.target.value)}
-                      placeholder="Frontend (Optional)"
-                      className="theme-input rounded-xl px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={builderData.skills.backend}
-                      onChange={(e) => updateSkill('backend', e.target.value)}
-                      placeholder="Backend (Optional)"
-                      className="theme-input rounded-xl px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={builderData.skills.database}
-                      onChange={(e) => updateSkill('database', e.target.value)}
-                      placeholder="Database (Optional)"
-                      className="theme-input rounded-xl px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={builderData.skills.codeEditor}
-                      onChange={(e) => updateSkill('codeEditor', e.target.value)}
-                      placeholder="Code Editor (Optional)"
-                      className="theme-input rounded-xl px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={builderData.skills.aiTools}
-                      onChange={(e) => updateSkill('aiTools', e.target.value)}
-                      placeholder="AI Tools (Optional)"
-                      className="theme-input rounded-xl px-3 py-2 text-sm md:col-span-2"
-                    />
+                  <div className="md:col-span-2">
+                    <p className="mb-2 text-sm font-semibold">Skills Section</p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        value={builderData.skills.frontend}
+                        onChange={(e) => updateSkill('frontend', e.target.value)}
+                        placeholder="Frontend (Optional)"
+                        className="theme-input rounded-xl px-3 py-2 text-sm"
+                      />
+                      <input
+                        value={builderData.skills.backend}
+                        onChange={(e) => updateSkill('backend', e.target.value)}
+                        placeholder="Backend (Optional)"
+                        className="theme-input rounded-xl px-3 py-2 text-sm"
+                      />
+                      <input
+                        value={builderData.skills.database}
+                        onChange={(e) => updateSkill('database', e.target.value)}
+                        placeholder="Database (Optional)"
+                        className="theme-input rounded-xl px-3 py-2 text-sm"
+                      />
+                      <input
+                        value={builderData.skills.codeEditor}
+                        onChange={(e) => updateSkill('codeEditor', e.target.value)}
+                        placeholder="Code Editor (Optional)"
+                        className="theme-input rounded-xl px-3 py-2 text-sm"
+                      />
+                      <input
+                        value={builderData.skills.aiTools}
+                        onChange={(e) => updateSkill('aiTools', e.target.value)}
+                        placeholder="AI Tools (Optional)"
+                        className="theme-input rounded-xl px-3 py-2 text-sm md:col-span-2"
+                      />
+                    </div>
                   </div>
 
                   <textarea

@@ -1,7 +1,7 @@
 function scoreBadgeClass(score) {
-  if (score >= 80) return 'badge-strong';
-  if (score >= 60) return 'badge-medium';
-  return 'badge-weak';
+  if (score >= 80) return 'score-ring-strong';
+  if (score >= 60) return 'score-ring-medium';
+  return 'score-ring-weak';
 }
 
 function shortlistMessage(score) {
@@ -26,7 +26,12 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
             <h2 className="text-2xl font-extrabold">ATS Score Report</h2>
             <p className="theme-muted mt-1 text-sm">{shortlistMessage(overallScore)}</p>
           </div>
-          <div className={`ats-score-circle text-lg font-extrabold ${scoreBadgeClass(overallScore)}`}>{overallScore}/100</div>
+          <div
+            className={`ats-score-circle text-lg font-extrabold ${scoreBadgeClass(overallScore)}`}
+            style={{ '--score-value': overallScore }}
+          >
+            <span>{overallScore}/100</span>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
