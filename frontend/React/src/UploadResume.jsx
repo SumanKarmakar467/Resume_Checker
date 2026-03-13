@@ -10,6 +10,7 @@ const initialBuilderData = {
   fullName: '',
   email: '',
   phone: '',
+  github: '',
   location: '',
   linkedin: '',
   targetRole: '',
@@ -27,24 +28,92 @@ const initialBuilderData = {
 const templates = [
   {
     id: 'clean-pro',
-    name: 'Clean Professional',
+    name: 'Student Pro ATS',
     score: 92,
-    description: 'ATS-safe and clean.',
-    preview: 'Rahul Sen sample profile'
+    description: 'Matches your latest resume style with strong ATS headings.',
+    preview: 'Projects-first student layout + clear skills/education',
+    sampleResume: `SUMAN KUMAR
+MERN STACK DEVELOPER | KOLKATA
+Email | Phone | GitHub | LinkedIn
+
+ABOUT ME
+Final-year B.Tech CSE student with hands-on MERN projects and strong DSA practice.
+
+PROJECTS
+LeetCode Metrics Tracker | Demo | Source
+- Built real-time coding analytics dashboard with API integration.
+- Improved tracking efficiency and optimized load speed.
+
+Bella Vista Restaurant Website | Demo | Source
+- Designed responsive UI and improved user navigation.
+
+EDUCATION
+B.Tech CSE, GKCEM (2022-2026)
+12th WBCHSE - 88.60%
+10th WBBSE - 70.57%
+
+ADDITIONAL INFORMATION
+Skills: React, Node.js, Express.js, MongoDB, Java, DSA, OOP
+Languages: English, Hindi, Bengali`
   },
   {
     id: 'impact-first',
-    name: 'Impact First',
+    name: 'Impact MERN ATS',
     score: 89,
-    description: 'Achievement-heavy format.',
-    preview: 'Priya Das sample profile'
+    description: 'Quantified project bullets for better recruiter impact.',
+    preview: 'Achievement-focused bullets with ATS-friendly structure',
+    sampleResume: `SUMAN KUMAR
+MERN STACK DEVELOPER & DSA ENTHUSIAST
+Email | Phone | GitHub | LinkedIn
+
+PROFESSIONAL SUMMARY
+Built and deployed full-stack web projects with measurable UI and performance improvements.
+
+KEY PROJECTS
+Portfolio Website | Demo | Source
+- Built responsive portfolio; improved profile visibility.
+- Deployed on GitHub Pages with version-controlled releases.
+
+Food Showcase App | Demo | Source
+- Created interactive responsive UI with modern layout.
+- Improved mobile usability and loading consistency.
+
+TECHNICAL SKILLS
+Frontend: HTML, CSS, JavaScript, React
+Backend: Node.js, Express.js
+Database: MongoDB
+Core: Java, DSA, OOP
+
+EDUCATION
+B.Tech CSE (2022-2026), GKCEM
+12th - 88.60%, 10th - 70.57%`
   },
   {
     id: 'minimal-ats',
-    name: 'Minimal ATS',
+    name: 'Classic Fresher ATS',
     score: 86,
-    description: 'Compact ATS structure.',
-    preview: 'Anik Pal sample profile'
+    description: 'Simple fresher resume format inspired by your PDF structure.',
+    preview: 'Clean one-page ATS style for internships and fresher roles',
+    sampleResume: `SUMAN KUMAR | Email | Phone | GitHub | LinkedIn | Kolkata
+
+TARGET ROLE
+Software Engineer / MERN Developer
+
+SUMMARY
+Final-year CSE student with practical full-stack project experience.
+
+PROJECTS
+1) LeetCode Metrics Tracker - React, API, Vercel (Demo | Source)
+2) Restaurant Website - HTML, CSS, JS (Demo | Source)
+3) Portfolio Website - HTML, CSS, JS (Live | Source)
+
+EDUCATION
+B.Tech CSE - 2022-2026
+12th WBCHSE - 88.60%
+10th WBBSE - 70.57%
+
+SKILLS
+Java, JavaScript, React, Node.js, Express.js, MongoDB, Git, GitHub, VS Code`
   }
 ];
 
@@ -75,7 +144,7 @@ const scoreDraft = (draft, jd) => {
 
 function buildDraft(data, jdKeywords, templateName) {
   const contact =
-    [data.email, data.phone, data.location, data.linkedin].filter((x) => hasText(x)).join(' | ') ||
+    [data.email, data.phone, data.location, data.linkedin, data.github].filter((x) => hasText(x)).join(' | ') ||
     'yourmail@example.com | +1 000 000 0000';
 
   const skills =
@@ -231,6 +300,12 @@ function UploadResume() {
   const handleBuild = (e) => {
     e.preventDefault();
     setBuilderError('');
+
+    if (!hasText(builderData.fullName) || !hasText(builderData.email) || !hasText(builderData.phone)) {
+      setBuilderError('Name, Email and Phone are mandatory.');
+      return;
+    }
+
     const t = templates.find((x) => x.id === selectedTemplate) || templates[0];
     const keys = keywordsFromJd(builderJobDescription).join(', ');
     const draft = buildDraft(builderData, keys, t.name);
@@ -448,9 +523,13 @@ function UploadResume() {
             </div>
 
             {builderStep === 'templates' ? (
-              <div className="grid gap-4 md:grid-cols-3">
-                {templates.map((t) => (
-                  <button
+              <>
+                <p className="mb-3 text-sm theme-muted">
+                  ATS templates below are now modeled on your resume style (student profile + projects + education + skills).
+                </p>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {templates.map((t) => (
+                    <button
                     key={t.id}
                     type="button"
                     onClick={() => {
@@ -467,9 +546,16 @@ function UploadResume() {
                     <p className="theme-muted mt-1 text-xs">{t.description}</p>
                     <p className="theme-muted mt-2 text-xs">Random sample: {t.preview}</p>
                     <p className="theme-accent mt-2 text-xs font-semibold">Template ATS Score: {t.score}/100</p>
-                  </button>
-                ))}
-              </div>
+                    <div className="mt-3 rounded-lg border border-[var(--border-color)] bg-[var(--input-bg)] p-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide theme-muted">Generated Resume Sample</p>
+                      <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed theme-muted">
+                        {t.sampleResume}
+                      </pre>
+                    </div>
+                    </button>
+                  ))}
+                </div>
+              </>
             ) : (
               <>
                 <p className="mb-4 text-sm font-semibold">
@@ -480,19 +566,28 @@ function UploadResume() {
                   <input
                     value={builderData.fullName}
                     onChange={(e) => updateTop('fullName', e.target.value)}
-                    placeholder="Full Name (Optional)"
+                    placeholder="Full Name (Required)"
+                    required
                     className="theme-input rounded-xl px-3 py-2 text-sm"
                   />
                   <input
                     value={builderData.email}
                     onChange={(e) => updateTop('email', e.target.value)}
-                    placeholder="Email (Optional)"
+                    placeholder="Email (Required)"
+                    required
                     className="theme-input rounded-xl px-3 py-2 text-sm"
                   />
                   <input
                     value={builderData.phone}
                     onChange={(e) => updateTop('phone', e.target.value)}
-                    placeholder="Phone (Optional)"
+                    placeholder="Phone (Required)"
+                    required
+                    className="theme-input rounded-xl px-3 py-2 text-sm"
+                  />
+                  <input
+                    value={builderData.github}
+                    onChange={(e) => updateTop('github', e.target.value)}
+                    placeholder="GitHub (Optional)"
                     className="theme-input rounded-xl px-3 py-2 text-sm"
                   />
                   <input
