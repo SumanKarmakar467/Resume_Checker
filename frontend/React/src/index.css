@@ -219,6 +219,49 @@ html {
   background: linear-gradient(140deg, rgba(10, 16, 33, 0.92), rgba(12, 29, 51, 0.78));
 }
 
+.landing-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: #101114;
+}
+
+.brand-icon {
+  width: 1.45rem;
+  height: 2rem;
+  border: 2px solid #101114;
+  border-radius: 0.15rem;
+  position: relative;
+}
+
+.brand-icon::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-top: 2px solid #101114;
+  border-right: 2px solid #101114;
+}
+
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .landing-badge {
   display: inline-flex;
   align-items: center;
@@ -230,6 +273,39 @@ html {
   text-transform: uppercase;
   padding: 0.3rem 0.8rem;
   background: var(--surface-soft);
+}
+
+.trust-strip {
+  margin-top: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.6rem;
+  background: #ffffff;
+  font-size: 0.82rem;
+  color: #303743;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+}
+
+.trust-stars {
+  color: #16a34a;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.choose-template-row {
+  margin-top: 2rem;
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+}
+
+@media (min-width: 900px) {
+  .choose-template-row {
+    grid-template-columns: 1fr auto;
+  }
 }
 
 .landing-cta-primary {

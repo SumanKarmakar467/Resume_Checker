@@ -481,14 +481,25 @@ function UploadResume() {
   return (
     <main className="theme-page min-h-screen px-4 py-8 transition-colors duration-300 md:px-6 md:py-12">
       <div className="mx-auto max-w-7xl">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="theme-accent text-sm font-semibold uppercase tracking-[0.25em]">Resume Intelligence Studio</p>
-            <h1 className="mt-1 text-3xl font-extrabold leading-tight md:text-4xl">ATS Resume Checker And Builder</h1>
+        <header className="landing-topbar mb-6">
+          <div className="landing-brand">
+            <span className="brand-icon" />
+            <div className="leading-tight">
+              <p className="text-2xl font-extrabold">Resume</p>
+              <p className="-mt-1 text-2xl font-extrabold">Studio</p>
+            </div>
           </div>
-          <button type="button" onClick={toggleTheme} className="theme-toggle rounded-full px-4 py-2 text-sm font-semibold">
-            {isDark ? 'Light Mode' : 'Dark Mode'}
-          </button>
+          <div className="landing-nav-actions">
+            {activeView === 'home' ? (
+              <>
+                <button type="button" className="text-sm font-semibold theme-muted">Contact Us</button>
+                <button type="button" className="text-sm font-semibold theme-muted">Login</button>
+              </>
+            ) : null}
+            <button type="button" onClick={toggleTheme} className="theme-toggle rounded-full px-4 py-2 text-sm font-semibold">
+              {isDark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+          </div>
         </header>
 
         {activeView === 'home' ? (
@@ -496,47 +507,61 @@ function UploadResume() {
             <section className="landing-hero reveal-on-scroll">
               <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
                 <div>
-                  <p className="landing-badge">Built For Modern Hiring</p>
+                  <p className="landing-badge">India's Top Resume Templates</p>
                   <h2 className="mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-                    Build and Optimize resumes that pass ATS and impress recruiters.
+                    Create a resume that gets results.
                   </h2>
                   <p className="theme-muted mt-4 max-w-2xl text-sm md:text-base">
-                    A professional workspace for checking ATS score, improving content with AI, and generating clean, recruiter-ready resume drafts.
+                    Get recruiter-approved templates and step-by-step recommendations to create a new resume or optimize your current one.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => setActiveView('checker')}
+                      onClick={openBuilder}
                       className="landing-cta-primary rounded-xl px-5 py-3 text-sm font-bold text-white"
                     >
-                      Launch ATS Checker
+                      Create new resume
                     </button>
                     <button
                       type="button"
-                      onClick={openBuilder}
+                      onClick={() => setActiveView('checker')}
                       className="landing-cta-secondary rounded-xl px-5 py-3 text-sm font-bold"
                     >
-                      Open Resume Builder
+                      Optimize my resume
+                    </button>
+                  </div>
+
+                  <div className="trust-strip">
+                    <span className="font-bold">EXCELLENT</span>
+                    <span className="trust-stars">★★★★★</span>
+                    <span>4.5 out of 5 based on 16,286 reviews</span>
+                    <span className="font-bold">Trustpilot</span>
+                  </div>
+
+                  <div className="choose-template-row">
+                    <p className="text-3xl font-extrabold leading-tight md:text-5xl">Create a resume that gets results</p>
+                    <button type="button" onClick={openBuilder} className="landing-cta-primary rounded-full px-8 py-3 text-base font-bold text-white">
+                      Choose a template
                     </button>
                   </div>
                 </div>
 
                 <div className="hero-panel">
                   <div className="hero-glow" />
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] theme-accent">Live Snapshot</p>
-                  <h3 className="mt-2 text-xl font-extrabold">Hiring Readiness Dashboard</h3>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] theme-accent">Enhance with AI</p>
+                  <h3 className="mt-2 text-xl font-extrabold">Professional Resume Preview</h3>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="floating-stat">
-                      <p className="text-2xl font-extrabold">92</p>
-                      <p className="theme-muted text-xs">Average Template ATS</p>
+                      <p className="text-2xl font-extrabold">Recruiter</p>
+                      <p className="theme-muted text-xs">Approved Templates</p>
                     </div>
                     <div className="floating-stat">
-                      <p className="text-2xl font-extrabold">2-Click</p>
-                      <p className="theme-muted text-xs">Template To Draft Flow</p>
+                      <p className="text-2xl font-extrabold">15 Min</p>
+                      <p className="theme-muted text-xs">Faster Resume Flow</p>
                     </div>
                     <div className="floating-stat sm:col-span-2">
-                      <p className="text-sm font-bold">Optional Input System</p>
-                      <p className="theme-muted text-xs">Experience, projects, education, and skills can all be skipped.</p>
+                      <p className="text-sm font-bold">Smart ATS Optimization</p>
+                      <p className="theme-muted text-xs">Choose template, add details, and improve content using ATS AI.</p>
                     </div>
                   </div>
                 </div>
