@@ -1,10 +1,6 @@
 import { useState } from 'react';
-
-function scoreBadgeClass(score) {
-  if (score >= 80) return 'score-ring-strong';
-  if (score >= 60) return 'score-ring-medium';
-  return 'score-ring-weak';
-}
+import ScoreMeter from './components/ScoreMeter';
+import KeywordPills from './components/KeywordPills';
 
 function shortlistMessage(score) {
   if (score >= 80) return 'Good enough for shortlist in many ATS filters. Tailor it per job before applying.';
@@ -19,7 +15,7 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
   const weakSections = sections.filter((section) => (section.score || 0) < 70);
   const missingKeywords = analysis?.missingKeywords || [];
   const matchedKeywords = analysis?.matchedKeywords || [];
-  const overallScore = analysis?.overallScore || 0;
+  const atsScore = analysis?.atsScore ?? analysis?.overallScore ?? 0;
 
   return (
     <section className="mt-8 space-y-5">
@@ -27,14 +23,9 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-extrabold">ATS Score Report</h2>
-            <p className="theme-muted mt-1 text-sm">{shortlistMessage(overallScore)}</p>
+            <p className="theme-muted mt-1 text-sm">{shortlistMessage(atsScore)}</p>
           </div>
-          <div
-            className={`ats-score-circle text-lg font-extrabold ${scoreBadgeClass(overallScore)}`}
-            style={{ '--score-value': overallScore }}
-          >
-            <span>{overallScore}/100</span>
-          </div>
+          <ScoreMeter score={atsScore} />
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -62,31 +53,7 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
           </ul>
         </article>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <article className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-sm font-bold uppercase tracking-wide">Matched Keywords</h3>
-            <p className="theme-muted mt-1 text-xs">{matchedKeywords.length} found</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {matchedKeywords.slice(0, 16).map((keyword) => (
-                <span key={keyword} className="keyword-chip keyword-chip-strong">
-                  {keyword}
-                </span>
-              ))}
-            </div>
-          </article>
-
-          <article className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface-soft)] p-4">
-            <h3 className="text-sm font-bold uppercase tracking-wide">Missing Keywords</h3>
-            <p className="theme-muted mt-1 text-xs">{missingKeywords.length} missing</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {missingKeywords.slice(0, 16).map((keyword) => (
-                <span key={keyword} className="keyword-chip keyword-chip-weak">
-                  {keyword}
-                </span>
-              ))}
-            </div>
-          </article>
-        </div>
+        <KeywordPills matchedKeywords={matchedKeywords} missingKeywords={missingKeywords} />
       </div>
 
       <div className="theme-card p-5 md:p-6">
