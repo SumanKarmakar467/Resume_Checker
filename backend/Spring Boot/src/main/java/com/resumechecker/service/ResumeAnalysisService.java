@@ -41,6 +41,7 @@ public class ResumeAnalysisService {
         int overallScore = (int) Math.round(
                 sections.stream().mapToInt(SectionFeedback::score).average().orElse(0)
         );
+        int atsScore = calculateAtsScore(normalizedResume, safeResume, keywordResult);
 
         LinkedHashSet<String> uniqueSuggestions = new LinkedHashSet<>();
         for (SectionFeedback section : sections) {
@@ -54,6 +55,7 @@ public class ResumeAnalysisService {
 
         return new ResumeAnalysisResponse(
                 clamp(overallScore),
+                atsScore,
                 sections,
                 keywordResult.matchedKeywords,
                 keywordResult.missingKeywords,
@@ -324,7 +326,9 @@ public class ResumeAnalysisService {
         return new KeywordResult(
                 feedback("Keyword Match", score, issues, suggestions),
                 missing.subList(0, Math.min(20, missing.size())),
-                matched.subList(0, Math.min(20, matched.size()))
+                matched.subList(0, Math.min(20, matched.size())),
+                count,
+                keywords.size()
         );
     }
 
@@ -391,6 +395,68 @@ public class ResumeAnalysisService {
         return (int) Math.round(values.stream().mapToInt(v -> v).average().orElse(0));
     }
 
+    private int calculateAtsScore(String normalizedResume, String rawResume, KeywordResult keywordResult) {
+        double keywordScore = keywordResult.totalKeywords == 0
+                ? 70.0
+                : (keywordResult.matchedCount * 100.0) / keywordResult.totalKeywords;
+
+        boolean hasSkillsHeading = normalizedResume.contains("skills")
+                || normalizedResume.contains("technical skills")
+                || normalizedResume.contains("tech skills");
+        double skillsScore = hasSkillsHeading ? 100.0 : 0.0;
+
+        boolean hasQuantifiedExperience = hasQuantifiedBullet(rawResume);
+        double quantifiedScore = hasQuantifiedExperience ? 100.0 : 0.0;
+
+        int contactFound = 0;
+        if (Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}").matcher(rawResume).find()) {
+            contactFound++;
+        }
+        if (Pattern.compile("(?:\\+?\\d{1,3}[\\s-]?)?(?:\\(?\\d{3}\\)?[\\s-]?)?\\d{3}[\\s-]?\\d{4}").matcher(rawResume).find()) {
+            contactFound++;
+        }
+        if (normalizedResume.contains("linkedin")) {
+            contactFound++;
+        }
+        double contactScore = (contactFound / 3.0) * 100.0;
+
+        int sectionsFound = 0;
+        if (normalizedResume.contains("summary")
+                || normalizedResume.contains("professional profile")
+                || normalizedResume.contains("objective")) {
+            sectionsFound++;
+        }
+        if (hasSkillsHeading) sectionsFound++;
+        if (normalizedResume.contains("experience") || normalizedResume.contains("work history")) sectionsFound++;
+        if (normalizedResume.contains("education")) sectionsFound++;
+        double completenessScore = (sectionsFound / 4.0) * 100.0;
+
+        double totalScore = (keywordScore * 0.40)
+                + (skillsScore * 0.15)
+                + (quantifiedScore * 0.20)
+                + (contactScore * 0.10)
+                + (completenessScore * 0.15);
+
+        return clamp((int) Math.round(totalScore));
+    }
+
+    private boolean hasQuantifiedBullet(String rawResume) {
+        if (rawResume == null || rawResume.isBlank()) return false;
+        String[] lines = rawResume.split("\\R");
+        Pattern numberPattern = Pattern.compile("\\b\\d+%?\\b");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+            boolean isBullet = trimmed.startsWith("-")
+                    || trimmed.startsWith("*")
+                    || trimmed.matches("^\\d+[\\.)]\\s+.*");
+            if (isBullet && numberPattern.matcher(trimmed).find()) {
+                return true;
+            }
+        }
+        return numberPattern.matcher(rawResume).find();
+    }
+
     private SectionFeedback feedback(String section, int rawScore, List<String> issues, List<String> suggestions) {
         int score = clamp(rawScore);
         String status = "Low";
@@ -417,6 +483,12 @@ public class ResumeAnalysisService {
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
-    private record KeywordResult(SectionFeedback feedback, List<String> missingKeywords, List<String> matchedKeywords) {
+    private record KeywordResult(
+            SectionFeedback feedback,
+            List<String> missingKeywords,
+            List<String> matchedKeywords,
+            int matchedCount,
+            int totalKeywords
+    ) {
     }
 }

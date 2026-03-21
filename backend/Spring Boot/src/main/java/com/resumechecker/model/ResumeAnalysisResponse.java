@@ -4,6 +4,7 @@ import java.util.List;
 
 public record ResumeAnalysisResponse(
         int overallScore,
+        int atsScore,
         List<SectionFeedback> sections,
         List<String> matchedKeywords,
         List<String> missingKeywords,
