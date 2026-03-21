@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ScoreMeter from './components/ScoreMeter';
 import KeywordPills from './components/KeywordPills';
+import BreakdownCard from './components/BreakdownCard';
 
 function shortlistMessage(score) {
   if (score >= 80) return 'Good enough for shortlist in many ATS filters. Tailor it per job before applying.';
@@ -52,6 +53,8 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading }) 
             ))}
           </ul>
         </article>
+
+        <BreakdownCard sections={sections} />
 
         <KeywordPills matchedKeywords={matchedKeywords} missingKeywords={missingKeywords} />
       </div>
