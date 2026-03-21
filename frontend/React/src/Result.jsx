@@ -7,9 +7,7 @@ import KeywordPills from './components/KeywordPills';
 import BreakdownCard from './components/BreakdownCard';
 import SuggestionCard from './components/SuggestionCard';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/resume` : '/api/resume');
+const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/resume` : '/api/resume';
 
 function shortlistMessage(score) {
   if (score >= 80) return 'Good enough for shortlist in many ATS filters. Tailor it per job before applying.';
@@ -175,6 +173,10 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading, jo
                 <SuggestionCard key={`${index}-${suggestion?.improvedLine || suggestion?.improved_line || 'suggestion'}`} suggestion={suggestion} />
               ))}
             </div>
+          ) : null}
+
+          {!aiLoading && !aiError && !hasAiSuggestions ? (
+            <p className="theme-muted mt-4 text-sm">Click "Get AI Suggestions" to generate 5 rewrite recommendations.</p>
           ) : null}
         </div>
       </div>
