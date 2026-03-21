@@ -3,6 +3,10 @@ package com.resumechecker.controller;
 import com.resumechecker.model.GenerateResumeRequest;
 import com.resumechecker.model.GenerateResumeResponse;
 import com.resumechecker.model.ResumeAnalysisResponse;
+import com.resumechecker.model.Suggestion;
+import com.resumechecker.model.SuggestionsRequest;
+import com.resumechecker.model.SuggestionsResponse;
+import com.resumechecker.service.GeminiService;
 import com.resumechecker.service.ResumeAnalysisService;
 import com.resumechecker.service.ResumeParser;
 import org.springframework.http.HttpStatus;
@@ -19,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -27,10 +32,12 @@ import java.util.Map;
 public class ResumeController {
     private final ResumeAnalysisService analysisService;
     private final ResumeParser resumeParser;
+    private final GeminiService geminiService;
 
-    public ResumeController(ResumeAnalysisService analysisService, ResumeParser resumeParser) {
+    public ResumeController(ResumeAnalysisService analysisService, ResumeParser resumeParser, GeminiService geminiService) {
         this.analysisService = analysisService;
         this.resumeParser = resumeParser;
+        this.geminiService = geminiService;
     }
 
     @GetMapping("/health")
@@ -58,6 +65,15 @@ public class ResumeController {
                 request.jobDescription()
         );
         return new GenerateResumeResponse(generatedResume);
+    }
+
+    @PostMapping("/suggestions")
+    public SuggestionsResponse suggestions(@RequestBody SuggestionsRequest request) {
+        List<Suggestion> suggestions = geminiService.getSuggestions(
+                request.resumeText(),
+                request.jobDescription()
+        );
+        return new SuggestionsResponse(suggestions);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
