@@ -877,6 +877,7 @@ function UploadResume() {
                 setResumeDraft={setResumeDraft}
                 onGenerate={async () => setResumeDraft(await fetchAtsDraft(analysis.extractedText, checkerJobDescription))}
                 loading={loading}
+                jobDescription={checkerJobDescription}
               />
             ) : null}
           </section>
