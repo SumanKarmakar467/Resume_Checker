@@ -1,13 +1,11 @@
 import { useMemo, useState } from 'react';
-import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import api from './api/axios';
 import ScoreMeter from './components/ScoreMeter';
 import KeywordPills from './components/KeywordPills';
 import BreakdownCard from './components/BreakdownCard';
 import SuggestionCard from './components/SuggestionCard';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/resume` : '/api/resume';
 
 function shortlistMessage(score) {
   if (score >= 80) return 'Good enough for shortlist in many ATS filters. Tailor it per job before applying.';
@@ -15,6 +13,9 @@ function shortlistMessage(score) {
   return 'Low shortlist chance right now. Fix weak sections and missing keywords first.';
 }
 
+/**
+ * Render ATS analysis, AI suggestions, and downloadable report UI.
+ */
 function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading, jobDescription = '' }) {
   const [canvaStyle, setCanvaStyle] = useState('classic');
   const [aiLoading, setAiLoading] = useState(false);
@@ -41,7 +42,7 @@ function Result({ analysis, resumeDraft, setResumeDraft, onGenerate, loading, jo
     setAiLoading(true);
     setAiError('');
     try {
-      const response = await axios.post(`${API_BASE_URL}/suggestions`, {
+      const response = await api.post('/api/resume/suggestions', {
         resumeText,
         jobDescription
       });

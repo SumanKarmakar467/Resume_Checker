@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { jsPDF } from 'jspdf';
+import api from './api/axios';
 import Result from './Result';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/resume';
+import {
+  MAX_RESUME_FILE_SIZE_BYTES,
+  MESSAGES,
+  SUPPORTED_RESUME_EXTENSIONS
+} from './constants/resumeCheckerConstants';
 
 const emptyProject = () => ({ name: '', description: '', liveLink: '', sourceCode: '' });
 const emptyEducation = () => ({ level: '10th', board: '', percentage: '', year: '' });
@@ -481,6 +484,9 @@ ${keys}
 `;
 }
 
+/**
+ * Main page for resume checking and ATS resume builder workflows.
+ */
 function UploadResume() {
   const [activeView, setActiveView] = useState('home');
   const [builderStep, setBuilderStep] = useState('templates');
@@ -540,15 +546,25 @@ function UploadResume() {
   };
 
   const fetchAtsDraft = async (resumeText, jobDescription) =>
-    (await axios.post(`${API_BASE_URL}/generate-ats`, { resumeText, jobDescription }))?.data?.generatedResume || '';
+    (await api.post('/api/resume/generate-ats', { resumeText, jobDescription }))?.data?.generatedResume || '';
+
+  const getJobTitleFromDescription = (description) => {
+    if (!description?.trim()) return '';
+    const firstLine = description.trim().split(/\r?\n/)[0]?.trim() || '';
+    return firstLine.slice(0, 120);
+  };
 
   const handleAnalyze = async (event) => {
     event.preventDefault();
-    if (!file) return setError('Please upload your resume in PDF or DOCX format.');
+    if (!file) return setError(MESSAGES.uploadRequired);
 
     const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx')) {
-      return setError('Only PDF or DOCX files are supported right now.');
+    const hasSupportedExtension = SUPPORTED_RESUME_EXTENSIONS.some((extension) => fileName.endsWith(extension));
+    if (!hasSupportedExtension) {
+      return setError(MESSAGES.uploadInvalidType);
+    }
+    if (file.size > MAX_RESUME_FILE_SIZE_BYTES) {
+      return setError(MESSAGES.uploadSizeExceeded);
     }
 
     setLoading(true);
@@ -560,14 +576,15 @@ function UploadResume() {
       const form = new FormData();
       form.append('file', file);
       form.append('jobDescription', checkerJobDescription);
+      form.append('jobTitle', getJobTitleFromDescription(checkerJobDescription));
 
-      const res = await axios.post(`${API_BASE_URL}/analyze`, form, {
+      const res = await api.post('/api/resume/analyze', form, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setAnalysis(res.data);
       if (res.data?.extractedText) setResumeDraft(await fetchAtsDraft(res.data.extractedText, checkerJobDescription));
     } catch (e) {
-      setError(e?.response?.data?.error || e?.response?.data?.message || e?.message || 'Unable to analyze resume.');
+      setError(e?.response?.data?.error || e?.response?.data?.message || e?.message || MESSAGES.analyzeFailed);
     } finally {
       setLoading(false);
     }
@@ -824,13 +841,13 @@ function UploadResume() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold">Upload Resume</p>
-                    <p className="theme-muted text-xs">PDF or DOCX</p>
+                    <p className="theme-muted text-xs">PDF, DOCX, or TXT (max 5MB)</p>
                   </div>
                   <label className="theme-button-primary cursor-pointer rounded-xl px-4 py-2 text-xs font-bold text-white">
                     Choose File
                     <input
                       type="file"
-                      accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                       onChange={(e) => setFile(e.target.files?.[0] || null)}
                       className="hidden"
                     />
