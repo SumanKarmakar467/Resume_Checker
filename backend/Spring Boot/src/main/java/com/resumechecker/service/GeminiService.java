@@ -41,6 +41,13 @@ public class GeminiService {
                 .build();
     }
 
+    /**
+     * Generate rewrite suggestions using Gemini against resume and job description text.
+     *
+     * @param resumeText extracted resume text
+     * @param jobDescription target job description
+     * @return up to 5 structured suggestions, or empty list on failure
+     */
     public List<Suggestion> getSuggestions(String resumeText, String jobDescription) {
         try {
             if (apiKey.isBlank()) {

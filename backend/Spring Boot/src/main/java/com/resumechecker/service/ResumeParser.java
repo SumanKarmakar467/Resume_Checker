@@ -14,7 +14,13 @@ import java.util.List;
 
 @Component
 public class ResumeParser {
-
+    /**
+     * Parse uploaded resume file content into plain text.
+     *
+     * @param file uploaded resume file
+     * @return extracted plain text from PDF, DOCX, or TXT
+     * @throws IOException when file content cannot be read
+     */
     public String parse(MultipartFile file) throws IOException {
         String fileName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase();

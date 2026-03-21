@@ -22,6 +22,13 @@ public class ResumeAnalysisService {
             "years", "year", "work", "role", "team", "using", "skills", "skill", "experience", "resume", "job"
     );
 
+    /**
+     * Analyze resume content against optional job description and return ATS diagnostics.
+     *
+     * @param resumeText raw extracted resume text
+     * @param jobDescription target job description text
+     * @return structured ATS analysis response
+     */
     public ResumeAnalysisResponse analyzeResume(String resumeText, String jobDescription) {
         String safeResume = resumeText == null ? "" : resumeText;
         String normalizedResume = normalize(safeResume);
@@ -65,6 +72,13 @@ public class ResumeAnalysisService {
         );
     }
 
+    /**
+     * Generate an ATS-friendly rewritten draft from parsed resume text.
+     *
+     * @param resumeText raw extracted resume text
+     * @param jobDescription target job description text
+     * @return generated ATS-friendly resume draft
+     */
     public String generateAtsFriendlyResume(String resumeText, String jobDescription) {
         String safeResume = resumeText == null ? "" : resumeText;
         String normalized = normalize(safeResume);
