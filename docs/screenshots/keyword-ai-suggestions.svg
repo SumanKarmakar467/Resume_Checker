@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Keyword and AI Suggestions Placeholder">
+  <rect width="1200" height="630" fill="#111827"/>
+  <rect x="80" y="80" width="500" height="470" rx="18" fill="#1f2937" stroke="#374151"/>
+  <text x="110" y="125" font-family="Arial, sans-serif" font-size="28" fill="#e5e7eb" font-weight="700">Keyword Match</text>
+  <rect x="110" y="155" width="120" height="36" rx="18" fill="#14532d"/>
+  <text x="170" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#bbf7d0">React</text>
+  <rect x="245" y="155" width="120" height="36" rx="18" fill="#14532d"/>
+  <text x="305" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#bbf7d0">Node.js</text>
+  <rect x="380" y="155" width="150" height="36" rx="18" fill="#7f1d1d"/>
+  <text x="455" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#fecaca">+ Docker</text>
+  <rect x="620" y="80" width="500" height="470" rx="18" fill="#1f2937" stroke="#374151"/>
+  <text x="650" y="125" font-family="Arial, sans-serif" font-size="28" fill="#e5e7eb" font-weight="700">AI Suggestions</text>
+  <rect x="650" y="160" width="440" height="110" rx="12" fill="#312e81"/>
+  <text x="670" y="198" font-family="Arial, sans-serif" font-size="18" fill="#c7d2fe">Current: Built dashboard.</text>
+  <text x="670" y="230" font-family="Arial, sans-serif" font-size="18" fill="#a7f3d0">Suggested: Built React dashboard used by 2k+ users.</text>
+  <rect x="650" y="290" width="440" height="110" rx="12" fill="#312e81"/>
+  <text x="670" y="328" font-family="Arial, sans-serif" font-size="18" fill="#c7d2fe">Current: Worked on APIs.</text>
+  <text x="670" y="360" font-family="Arial, sans-serif" font-size="18" fill="#a7f3d0">Suggested: Implemented 12 REST APIs in Spring Boot.</text>
+  <text x="600" y="590" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#6b7280">Replace with real app screenshot/GIF before sharing</text>
+</svg>
