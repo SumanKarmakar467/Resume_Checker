@@ -46,7 +46,7 @@ function Login() {
         password: password.trim()
       });
       login(response.data?.token || '');
-      navigate('/dashboard');
+      navigate('/app');
     } catch (err) {
       raiseError(err?.response?.data?.error || 'Unable to log in. Please check your credentials.');
     } finally {

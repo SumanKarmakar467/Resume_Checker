@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import api from './api/axios';
@@ -193,7 +193,7 @@ function getJobTitleFromDescription(description) {
 
 function UploadResume() {
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState('checker');
@@ -221,11 +221,6 @@ function UploadResume() {
 
   const [downloadName, setDownloadName] = useState('resume_output');
   const [autofillFile, setAutofillFile] = useState(null);
-
-  const formattedAuthAction = useMemo(
-    () => (isAuthenticated ? 'Dashboard & Logout' : 'Login / Register'),
-    [isAuthenticated]
-  );
 
   const handleAnalyze = async (event) => {
     event.preventDefault();
@@ -391,25 +386,12 @@ function UploadResume() {
             <button type="button" className="nav-pill" onClick={() => setActiveTab('builder')}>
               Resume Builder
             </button>
-            {isAuthenticated ? (
-              <>
-                <button type="button" className="nav-pill" onClick={() => navigate('/dashboard')}>
-                  Dashboard
-                </button>
-                <button type="button" className="nav-pill" onClick={handleLogout}>
-                  Logout
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" className="nav-pill" onClick={() => navigate('/login')}>
-                  Login
-                </button>
-                <button type="button" className="nav-pill" onClick={() => navigate('/register')}>
-                  Register
-                </button>
-              </>
-            )}
+            <button type="button" className="nav-pill" onClick={() => navigate('/dashboard')}>
+              Dashboard
+            </button>
+            <button type="button" className="nav-pill" onClick={handleLogout}>
+              Logout
+            </button>
             <button type="button" onClick={toggleTheme} className="theme-toggle">
               {isDark ? 'Light Theme' : 'Dark Theme'}
             </button>
@@ -421,7 +403,6 @@ function UploadResume() {
           <p className="theme-muted mt-2 text-sm">
             Theme enabled for light and dark mode. Email authentication available. You can either upload a resume to auto-extract details or fill the form manually.
           </p>
-          <p className="theme-muted mt-1 text-xs">Account status: {formattedAuthAction}</p>
         </section>
 
         {activeTab === 'checker' ? (
