@@ -14,18 +14,28 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [errorTick, setErrorTick] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [shakeForm, setShakeForm] = useState(false);
 
   const navigate = useNavigate();
   const { login } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+
+  const raiseError = (message) => {
+    setError(message);
+    setErrorTick((value) => value + 1);
+    setShakeForm(true);
+    setTimeout(() => setShakeForm(false), 420);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
 
     if (!email.trim() || !password.trim()) {
-      setError('Email and password are required.');
+      raiseError('Email and password are required.');
       return;
     }
 
@@ -38,7 +48,7 @@ function Login() {
       login(response.data?.token || '');
       navigate('/dashboard');
     } catch (err) {
-      setError(err?.response?.data?.error || 'Unable to log in. Please check your credentials.');
+      raiseError(err?.response?.data?.error || 'Unable to log in. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -82,7 +92,7 @@ function Login() {
             </ul>
           </aside>
 
-          <div className="theme-card auth-form-card auth-animate-rise">
+          <div className={`theme-card auth-form-card auth-animate-rise ${shakeForm ? 'auth-form-shake' : ''}`}>
             <h2 className="text-2xl font-extrabold">Log in</h2>
             <p className="theme-muted mt-1 text-sm">Use your email account to continue.</p>
 
@@ -94,24 +104,33 @@ function Login() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="theme-input"
+                  className="theme-input auth-input-glow"
                   required
                 />
               </label>
 
-              <label className="auth-field">
+              <label className="auth-field auth-password-field">
                 <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                  className="theme-input"
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter your password"
+                    className="theme-input auth-input-glow auth-password-input"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </label>
 
-              {error ? <p className="theme-error">{error}</p> : null}
+              {error ? <p key={errorTick} className="theme-error auth-error-bounce">{error}</p> : null}
 
               <button type="submit" disabled={loading} className="theme-button-primary w-full">
                 {loading ? 'Logging in...' : 'Log In'}

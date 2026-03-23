@@ -14,11 +14,23 @@ function Register() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [errorTick, setErrorTick] = useState(0);
   const [success, setSuccess] = useState('');
+  const [successTick, setSuccessTick] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [shakeForm, setShakeForm] = useState(false);
 
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
+
+  const raiseError = (message) => {
+    setError(message);
+    setErrorTick((value) => value + 1);
+    setShakeForm(true);
+    setTimeout(() => setShakeForm(false), 420);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -26,15 +38,15 @@ function Register() {
     setSuccess('');
 
     if (!email.trim() || !password.trim() || !confirm.trim()) {
-      setError('All fields are required.');
+      raiseError('All fields are required.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      raiseError('Password must be at least 6 characters.');
       return;
     }
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      raiseError('Passwords do not match.');
       return;
     }
 
@@ -45,9 +57,10 @@ function Register() {
         password: password.trim()
       });
       setSuccess('Account created. Redirecting to login...');
+      setSuccessTick((value) => value + 1);
       setTimeout(() => navigate('/login'), 900);
     } catch (err) {
-      setError(err?.response?.data?.error || 'Unable to register. Please try again.');
+      raiseError(err?.response?.data?.error || 'Unable to register. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -90,7 +103,7 @@ function Register() {
             </ul>
           </aside>
 
-          <div className="theme-card auth-form-card auth-animate-rise">
+          <div className={`theme-card auth-form-card auth-animate-rise ${shakeForm ? 'auth-form-shake' : ''} ${success ? 'auth-form-success' : ''}`}>
             <h2 className="text-2xl font-extrabold">Register</h2>
             <p className="theme-muted mt-1 text-sm">Create an email account to continue.</p>
 
@@ -102,38 +115,56 @@ function Register() {
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="you@example.com"
-                  className="theme-input"
+                  className="theme-input auth-input-glow"
                   required
                 />
               </label>
 
-              <label className="auth-field">
+              <label className="auth-field auth-password-field">
                 <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="At least 6 characters"
-                  className="theme-input"
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="At least 6 characters"
+                    className="theme-input auth-input-glow auth-password-input"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </label>
 
-              <label className="auth-field">
+              <label className="auth-field auth-password-field">
                 <span>Confirm Password</span>
-                <input
-                  type="password"
-                  value={confirm}
-                  onChange={(event) => setConfirm(event.target.value)}
-                  placeholder="Re-enter password"
-                  className="theme-input"
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirm}
+                    onChange={(event) => setConfirm(event.target.value)}
+                    placeholder="Re-enter password"
+                    className="theme-input auth-input-glow auth-password-input"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                  >
+                    {showConfirmPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </label>
 
-              {error ? <p className="theme-error">{error}</p> : null}
+              {error ? <p key={errorTick} className="theme-error auth-error-bounce">{error}</p> : null}
               {success ? (
-                <p className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--success-border)', background: 'var(--success-bg)', color: 'var(--success-text)' }}>
+                <p key={successTick} className="rounded-xl border px-3 py-2 text-sm auth-success-pop" style={{ borderColor: 'var(--success-border)', background: 'var(--success-bg)', color: 'var(--success-text)' }}>
                   {success}
                 </p>
               ) : null}
