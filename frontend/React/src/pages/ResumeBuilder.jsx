@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
 
 const API_BASE = "http://localhost:8080/api/resume";
@@ -8,6 +9,7 @@ const ACCEPTED_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "text/plain",
 ];
+const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const STEPS = [
   "Personal Info",
@@ -19,12 +21,52 @@ const STEPS = [
 ];
 
 const EMPTY = {
-  personal: { name: "", email: "", phone: "", location: "", linkedin: "", github: "" },
+  personal: {
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    linkedin: "",
+    github: "",
+    headline: "",
+    summary: "",
+    photoUrl: "",
+  },
   experience: [{ company: "", role: "", duration: "", bullets: ["", ""] }],
   education: [{ institute: "", degree: "", year: "" }],
   skills: { technical: "", tools: "", languages: "" },
   projects: [{ name: "", link: "", desc: "" }],
 };
+
+const RESUME_TEMPLATES = [
+  {
+    id: "ats_clean",
+    name: "ATS Clean",
+    description: "Single-column ATS-safe layout with clear sections.",
+    primary: "#0f766e",
+    background: "#ffffff",
+    text: "#111827",
+    sectionBg: "#f8fafc",
+  },
+  {
+    id: "modern_split",
+    name: "Modern Split",
+    description: "Two-column professional template with subtle color accents.",
+    primary: "#1d4ed8",
+    background: "#ffffff",
+    text: "#0f172a",
+    sectionBg: "#eff6ff",
+  },
+  {
+    id: "executive",
+    name: "Executive",
+    description: "Balanced premium look with elegant typography and spacing.",
+    primary: "#7c2d12",
+    background: "#fffdf7",
+    text: "#1f2937",
+    sectionBg: "#fffbeb",
+  },
+];
 
 function normalizeText(text) {
   return (text || "")
@@ -154,6 +196,9 @@ function parseUploadedResumeText(rawText) {
     /^[A-Za-z .'-]{3,}$/.test(firstLine)
       ? firstLine
       : "";
+  const maybeHeadline =
+    lines.find((line, idx) => idx > 0 && line.length > 8 && line.length < 80 && !/@/.test(line)) || "";
+  const maybeSummary = lines.slice(0, 8).find((line) => line.length > 60) || "";
 
   return {
     personal: {
@@ -163,6 +208,9 @@ function parseUploadedResumeText(rawText) {
       location: "",
       linkedin,
       github,
+      headline: maybeHeadline,
+      summary: maybeSummary,
+      photoUrl: "",
     },
     experience: [
       {
@@ -213,27 +261,34 @@ function mergeIntoBuilderData(parsed) {
   };
 }
 
-function exportTextAsPdf(text, fileName) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 42;
-  const lineHeight = 16;
-  const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
-  const maxHeight = doc.internal.pageSize.getHeight() - margin;
+async function exportNodeAsPdf(node, fileName) {
+  if (!node) return;
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(11);
-  const lines = doc.splitTextToSize(text || "", maxWidth);
-  let y = margin;
-  lines.forEach((line) => {
-    if (y > maxHeight) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(line, margin, y);
-    y += lineHeight;
+  const canvas = await html2canvas(node, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: "#ffffff",
   });
 
-  doc.save(`${sanitizePdfName(fileName)}.pdf`);
+  const imgData = canvas.toDataURL("image/png");
+  const pdf = new jsPDF("p", "pt", "a4");
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+  let heightLeft = imgHeight;
+  let position = 0;
+  pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
 
 /* ── STEP FORMS ── */
@@ -245,21 +300,80 @@ function PersonalForm({ data, onChange }) {
     ["location", "city, country", "text", "Kolkata, India"],
     ["linkedin", "linkedin_url", "text", "linkedin.com/in/yourprofile"],
     ["github", "github_url", "text", "github.com/SumanKarmakar467"],
+    ["headline", "professional_headline", "text", "Full Stack Developer | Java + React"],
   ];
+
+  const handlePhotoUpload = (file) => {
+    if (!file) return;
+    if (!PHOTO_TYPES.includes(file.type)) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      onChange({ ...data, photoUrl: String(reader.result || "") });
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-      {fields.map(([key, label, type, placeholder]) => (
-        <div key={key} className="form-group">
-          <label className="form-label">{label}</label>
-          <input
-            className="form-input"
-            type={type}
-            placeholder={placeholder}
-            value={data[key]}
-            onChange={(e) => onChange({ ...data, [key]: e.target.value })}
-          />
-        </div>
-      ))}
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        {fields.map(([key, label, type, placeholder]) => (
+          <div key={key} className="form-group">
+            <label className="form-label">{label}</label>
+            <input
+              className="form-input"
+              type={type}
+              placeholder={placeholder}
+              value={data[key]}
+              onChange={(e) => onChange({ ...data, [key]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">professional_summary</label>
+        <textarea
+          className="form-textarea"
+          rows={4}
+          placeholder="Write a concise summary with achievements and target role."
+          value={data.summary || ""}
+          onChange={(e) => onChange({ ...data, summary: e.target.value })}
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">profile_photo (optional)</label>
+        <input
+          className="form-input"
+          type="file"
+          accept=".png,.jpg,.jpeg,.webp"
+          onChange={(e) => handlePhotoUpload(e.target.files?.[0])}
+        />
+        {data.photoUrl ? (
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={data.photoUrl}
+              alt="profile preview"
+              style={{
+                width: 56,
+                height: 56,
+                objectFit: "cover",
+                borderRadius: "50%",
+                border: "2px solid var(--border)",
+              }}
+            />
+            <button
+              className="btn-ghost"
+              onClick={() => onChange({ ...data, photoUrl: "" })}
+              style={{ fontSize: 11, padding: "6px 10px" }}
+            >
+              remove_photo()
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -507,6 +621,8 @@ function ExportStep({
   onPdfFileNameChange,
   jobDescription,
   onJobDescriptionChange,
+  selectedTemplate,
+  onTemplateChange,
 }) {
   return (
     <div>
@@ -516,6 +632,37 @@ function ExportStep({
       <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: "1.2rem", lineHeight: 1.7 }}>
         Generate an improved resume, set a custom PDF name, and download.
       </p>
+
+      <div className="form-group">
+        <label className="form-label">choose_template</label>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: "0.6rem",
+          }}
+        >
+          {RESUME_TEMPLATES.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => onTemplateChange(template.id)}
+              style={{
+                borderRadius: 10,
+                border: `1px solid ${selectedTemplate === template.id ? template.primary : "var(--border)"}`,
+                background: selectedTemplate === template.id ? `${template.primary}22` : "var(--d3)",
+                color: selectedTemplate === template.id ? "#ffffff" : "var(--text)",
+                padding: "10px",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 12 }}>{template.name}</div>
+              <div style={{ fontSize: 11, opacity: 0.86, marginTop: 4 }}>{template.description}</div>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="form-group">
         <label className="form-label">job_description_for_optimization (optional)</label>
@@ -578,8 +725,8 @@ function ExportStep({
             {generatedResume}
           </div>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf}>
-              download_pdf()
+            <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf} disabled={loading}>
+              {loading ? "processing..." : "download_pdf()"}
             </button>
             <button className="btn-secondary" style={{ fontSize: 14 }} onClick={onGenerate} disabled={loading}>
               regenerate()
@@ -599,222 +746,231 @@ function ExportStep({
     </div>
   );
 }
-function LivePreview({ formData }) {
+function LivePreview({ formData, selectedTemplate }) {
   const { personal, experience, education, skills, projects } = formData;
+  const template = RESUME_TEMPLATES.find((item) => item.id === selectedTemplate) || RESUME_TEMPLATES[0];
+
   const allSkills = [skills.technical, skills.tools, skills.languages]
     .filter(Boolean)
-    .join(", ")
+    .join(",")
     .split(",")
-    .map((s) => s.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
+
+  const sectionTitle = (label) => (
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+        color: template.primary,
+        borderBottom: `2px solid ${template.primary}`,
+        paddingBottom: 3,
+        margin: "14px 0 8px",
+      }}
+    >
+      {label}
+    </div>
+  );
+
+  if (template.id === "modern_split") {
+    return (
+      <div
+        style={{
+          background: template.background,
+          color: template.text,
+          fontSize: 11,
+          lineHeight: 1.6,
+          borderRadius: 8,
+          minHeight: 720,
+          border: "1px solid #dbeafe",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr", minHeight: 720 }}>
+          <div style={{ background: "#eff6ff", padding: "18px 14px" }}>
+            {personal.photoUrl ? (
+              <img
+                src={personal.photoUrl}
+                alt="profile"
+                style={{ width: 90, height: 90, objectFit: "cover", borderRadius: "50%", marginBottom: 12 }}
+              />
+            ) : null}
+            <div style={{ fontSize: 10, color: "#1e3a8a", marginBottom: 4, fontWeight: 700 }}>CONTACT</div>
+            <div style={{ fontSize: 10 }}>{personal.email}</div>
+            <div style={{ fontSize: 10 }}>{personal.phone}</div>
+            <div style={{ fontSize: 10 }}>{personal.location}</div>
+            <div style={{ fontSize: 10 }}>{personal.linkedin}</div>
+            <div style={{ fontSize: 10 }}>{personal.github}</div>
+
+            {sectionTitle("Skills")}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {allSkills.map((item) => (
+                <span
+                  key={item}
+                  style={{
+                    fontSize: 9,
+                    background: "#dbeafe",
+                    color: "#1e3a8a",
+                    borderRadius: 12,
+                    padding: "2px 8px",
+                    border: "1px solid #bfdbfe",
+                  }}
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: "20px 18px" }}>
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#1d4ed8", lineHeight: 1.1 }}>
+              {personal.name || "Your Name"}
+            </div>
+            {personal.headline ? (
+              <div style={{ fontSize: 12, marginTop: 4, color: "#1f2937", fontWeight: 600 }}>{personal.headline}</div>
+            ) : null}
+            {personal.summary ? (
+              <div style={{ marginTop: 10, fontSize: 10.5, color: "#334155" }}>{personal.summary}</div>
+            ) : null}
+
+            {sectionTitle("Experience")}
+            {experience.map((item, i) => (
+              <div key={`exp-${i}`} style={{ marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 11 }}>{item.role || "Role"}</div>
+                <div style={{ fontSize: 10, color: "#475569" }}>
+                  {[item.company, item.duration].filter(Boolean).join(" | ")}
+                </div>
+                {item.bullets.filter(Boolean).map((bullet, idx) => (
+                  <div key={`b-${idx}`} style={{ fontSize: 10, color: "#334155", marginTop: 3 }}>
+                    - {bullet}
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {sectionTitle("Education")}
+            {education.map((item, i) => (
+              <div key={`edu-${i}`} style={{ fontSize: 10.5, marginBottom: 5 }}>
+                <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
+              </div>
+            ))}
+
+            {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
+            {projects.map((item, i) => (
+              <div key={`project-${i}`} style={{ marginBottom: 6 }}>
+                <div style={{ fontWeight: 700, fontSize: 10.5 }}>
+                  {[item.name, item.link].filter(Boolean).join(" | ")}
+                </div>
+                <div style={{ fontSize: 10, color: "#374151" }}>{item.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
-        background: "#fff",
+        background: template.background,
         borderRadius: 8,
-        padding: "1.5rem",
-        color: "#1a1a1a",
+        padding: "1.4rem",
+        color: template.text,
         fontSize: 11,
         lineHeight: 1.7,
-        minHeight: 440,
-        overflowY: "auto",
+        minHeight: 720,
+        border: `1px solid ${template.id === "executive" ? "#fed7aa" : "#d1fae5"}`,
       }}
     >
-      {/* Header */}
-      <div
-        style={{
-          borderBottom: "2px solid #00b366",
-          paddingBottom: 8,
-          marginBottom: 10,
-        }}
-      >
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#111" }}>
-          {personal.name || "Your Name"}
-        </div>
-        <div
-          style={{
-            fontSize: 10,
-            color: "#555",
-            fontFamily: "monospace",
-            marginTop: 3,
-          }}
-        >
-          {[personal.email, personal.phone, personal.location, personal.github]
-            .filter(Boolean)
-            .join(" · ") || "email · phone · location"}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: `3px solid ${template.primary}`, paddingBottom: 10 }}>
+        {personal.photoUrl ? (
+          <img
+            src={personal.photoUrl}
+            alt="profile"
+            style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: `2px solid ${template.primary}` }}
+          />
+        ) : null}
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: template.primary }}>{personal.name || "Your Name"}</div>
+          {personal.headline ? <div style={{ fontSize: 12, fontWeight: 600 }}>{personal.headline}</div> : null}
+          <div style={{ fontSize: 10.5, marginTop: 3, color: "#4b5563" }}>
+            {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github]
+              .filter(Boolean)
+              .join(" | ")}
+          </div>
         </div>
       </div>
 
-      {/* Experience */}
-      {experience.some((e) => e.role || e.company) && (
-        <>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#00b366",
-              borderBottom: "1px solid #e0e0e0",
-              paddingBottom: 3,
-              margin: "10px 0 6px",
-            }}
-          >
-            Experience
+      {personal.summary ? (
+        <div style={{ marginTop: 10, background: template.sectionBg, borderRadius: 8, padding: "10px 12px", color: "#374151" }}>
+          {personal.summary}
+        </div>
+      ) : null}
+
+      {sectionTitle("Experience")}
+      {experience.map((item, i) => (
+        <div key={`exp-${i}`} style={{ marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 11.5 }}>{item.role || "Role"}</div>
+          <div style={{ fontSize: 10.5, color: "#4b5563" }}>
+            {[item.company, item.duration].filter(Boolean).join(" | ")}
           </div>
-          {experience.map((e, i) => (
-            <div key={i} style={{ marginBottom: 8 }}>
-              <div style={{ fontWeight: 600, fontSize: 11 }}>
-                {e.role || "Job Title"}
-              </div>
-              <div style={{ fontSize: 10, color: "#555", marginBottom: 3 }}>
-                {e.company} {e.duration && `· ${e.duration}`}
-              </div>
-              {e.bullets
-                .filter(Boolean)
-                .map((b, j) => (
-                  <div
-                    key={j}
-                    style={{
-                      fontSize: 10,
-                      color: "#333",
-                      paddingLeft: 10,
-                      position: "relative",
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: "absolute",
-                        left: 0,
-                        color: "#00b366",
-                        fontSize: 8,
-                      }}
-                    >
-                      ▸
-                    </span>
-                    {b}
-                  </div>
-                ))}
+          {item.bullets.filter(Boolean).map((bullet, idx) => (
+            <div key={`bullet-${idx}`} style={{ fontSize: 10.5, color: "#374151", marginTop: 3 }}>
+              - {bullet}
             </div>
           ))}
-        </>
-      )}
+        </div>
+      ))}
 
-      {/* Education */}
-      {education.some((e) => e.institute) && (
-        <>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#00b366",
-              borderBottom: "1px solid #e0e0e0",
-              paddingBottom: 3,
-              margin: "10px 0 6px",
-            }}
-          >
-            Education
-          </div>
-          {education.map((e, i) => (
-            <div key={i} style={{ marginBottom: 5 }}>
-              <span style={{ fontWeight: 600 }}>{e.institute}</span>
-              {e.degree && (
-                <span style={{ color: "#555", fontSize: 10 }}>
-                  {" · "}
-                  {e.degree}
-                </span>
-              )}
-              {e.year && (
-                <span style={{ color: "#777", fontSize: 10 }}>
-                  {" · "}
-                  {e.year}
-                </span>
-              )}
-            </div>
+      {sectionTitle("Education")}
+      {education.map((item, i) => (
+        <div key={`edu-${i}`} style={{ marginBottom: 5, fontSize: 10.5 }}>
+          <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
+        </div>
+      ))}
+
+      {allSkills.length ? sectionTitle("Skills") : null}
+      {allSkills.length ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {allSkills.map((item) => (
+            <span
+              key={item}
+              style={{
+                fontSize: 9.5,
+                background: template.sectionBg,
+                border: `1px solid ${template.primary}55`,
+                color: template.primary,
+                padding: "2px 8px",
+                borderRadius: 12,
+              }}
+            >
+              {item}
+            </span>
           ))}
-        </>
-      )}
+        </div>
+      ) : null}
 
-      {/* Skills */}
-      {allSkills.length > 0 && (
-        <>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#00b366",
-              borderBottom: "1px solid #e0e0e0",
-              paddingBottom: 3,
-              margin: "10px 0 6px",
-            }}
-          >
-            Skills
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {allSkills.map((s) => (
-              <span
-                key={s}
-                style={{
-                  fontSize: 9,
-                  background: "#f0fdf4",
-                  border: "1px solid #bbf7d0",
-                  color: "#166534",
-                  padding: "2px 7px",
-                  borderRadius: 3,
-                  fontFamily: "monospace",
-                }}
-              >
-                {s}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Projects */}
-      {projects.some((p) => p.name) && (
-        <>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#00b366",
-              borderBottom: "1px solid #e0e0e0",
-              paddingBottom: 3,
-              margin: "10px 0 6px",
-            }}
-          >
-            Projects
-          </div>
-          {projects.map((p, i) => (
-            <div key={i} style={{ marginBottom: 6 }}>
-              <div style={{ fontWeight: 600 }}>
-                {p.name}
-                {p.link && (
-                  <span style={{ color: "#555", fontWeight: 400, fontSize: 9 }}>
-                    {" · "}
-                    {p.link}
-                  </span>
-                )}
-              </div>
-              {p.desc && <div style={{ fontSize: 10, color: "#333" }}>{p.desc}</div>}
-            </div>
-          ))}
-        </>
-      )}
+      {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
+      {projects.map((item, i) => (
+        <div key={`project-${i}`} style={{ marginBottom: 7 }}>
+          <div style={{ fontWeight: 700, fontSize: 10.5 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
+          <div style={{ fontSize: 10, color: "#374151" }}>{item.desc}</div>
+        </div>
+      ))}
     </div>
   );
 }
-
-/* ── MAIN COMPONENT ── */
-export default function ResumeBuilder({ navigate }) {
+/* MAIN COMPONENT */
+export default function ResumeBuilder({
+  navigate,
+  user,
+  guestBuilderUsed,
+  consumeGuestBuilderTry,
+  requireAuth,
+}) {
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
@@ -825,13 +981,24 @@ export default function ResumeBuilder({ navigate }) {
   const [importMessage, setImportMessage] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [pdfFileName, setPdfFileName] = useState("resume_ats_optimized");
+  const [selectedTemplate, setSelectedTemplate] = useState("ats_clean");
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [templateMessage, setTemplateMessage] = useState("");
+  const previewRef = useRef(null);
 
   const buildResumeText = (d) => {
     const lines = [];
     const p = d.personal;
     lines.push(p.name || "Your Name");
+    if (p.headline) lines.push(p.headline);
     lines.push([p.email, p.phone, p.location, p.linkedin, p.github].filter(Boolean).join(" | "));
     lines.push("");
+    if (p.summary) {
+      lines.push("SUMMARY");
+      lines.push("-------");
+      lines.push(p.summary);
+      lines.push("");
+    }
 
     if (d.experience.some((e) => e.role || e.company || e.bullets?.some(Boolean))) {
       lines.push("EXPERIENCE");
@@ -939,6 +1106,22 @@ export default function ResumeBuilder({ navigate }) {
     return fallback;
   };
 
+  const consumeBuilderGuestTryOrRedirect = () => {
+    if (user) return true;
+    if (guestBuilderUsed) {
+      setError("Free builder try already used. Please register/login to continue.");
+      requireAuth?.();
+      return false;
+    }
+    const allowed = consumeGuestBuilderTry?.();
+    if (!allowed) {
+      setError("Free builder try already used. Please register/login to continue.");
+      requireAuth?.();
+      return false;
+    }
+    return true;
+  };
+
   const handleImportExisting = async () => {
     if (!existingFile) {
       setError("Please select a resume file first.");
@@ -959,6 +1142,10 @@ export default function ResumeBuilder({ navigate }) {
       const mergedData = mergeIntoBuilderData(parsed);
       setFormData(mergedData);
 
+      if (!consumeBuilderGuestTryOrRedirect()) {
+        return;
+      }
+
       try {
         const optimizedText = await generateAtsResume(buildResumeText(mergedData));
         setGeneratedResume(optimizedText);
@@ -977,6 +1164,9 @@ export default function ResumeBuilder({ navigate }) {
   };
 
   const handleGenerate = async () => {
+    if (!consumeBuilderGuestTryOrRedirect()) {
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -991,19 +1181,32 @@ export default function ResumeBuilder({ navigate }) {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!generatedResume.trim()) {
       setError("Generate resume first, then download PDF.");
       return;
     }
-    exportTextAsPdf(generatedResume, pdfFileName);
+    if (!previewRef.current) {
+      setError("Preview is not ready yet. Please try again.");
+      return;
+    }
+    try {
+      setIsExportingPdf(true);
+      setTemplateMessage("");
+      await exportNodeAsPdf(previewRef.current, pdfFileName);
+      setTemplateMessage("Styled resume PDF downloaded successfully.");
+    } catch (_err) {
+      setError("Could not generate styled PDF. Please try again.");
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
 
   return (
     <div>
-      <Navbar navigate={navigate} />
+      <Navbar navigate={navigate} user={user} />
 
       <div
         style={{ maxWidth: 1120, margin: "0 auto", padding: "3.5rem 2rem" }}
@@ -1025,6 +1228,23 @@ export default function ResumeBuilder({ navigate }) {
             Build or improve your resume for a higher ATS score.
           </h1>
         </div>
+
+        {!user && (
+          <div
+            style={{
+              background: "rgba(0,229,255,0.06)",
+              border: "1px solid rgba(0,229,255,0.2)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              color: "var(--c)",
+              marginBottom: "1rem",
+            }}
+          >
+            guest_limit: builder tries left = {guestBuilderUsed ? 0 : 1}
+          </div>
+        )}
 
         <div className="card" style={{ marginBottom: "1.5rem" }}>
           <div className="card-head">import_existing_resume()</div>
@@ -1178,13 +1398,15 @@ export default function ResumeBuilder({ navigate }) {
                 <ExportStep
                   onGenerate={handleGenerate}
                   onDownloadPdf={handleDownloadPdf}
-                  loading={loading}
+                  loading={loading || isExportingPdf}
                   error={error}
                   generatedResume={generatedResume}
                   pdfFileName={pdfFileName}
                   onPdfFileNameChange={setPdfFileName}
                   jobDescription={jobDescription}
                   onJobDescriptionChange={setJobDescription}
+                  selectedTemplate={selectedTemplate}
+                  onTemplateChange={setSelectedTemplate}
                 />
               )}
 
@@ -1239,7 +1461,9 @@ export default function ResumeBuilder({ navigate }) {
                 </span>
               </div>
               <div style={{ padding: "1.25rem" }}>
-                <LivePreview formData={formData} />
+                <div ref={previewRef}>
+                  <LivePreview formData={formData} selectedTemplate={selectedTemplate} />
+                </div>
               </div>
             </div>
 
@@ -1258,9 +1482,26 @@ export default function ResumeBuilder({ navigate }) {
             >
               ats_tip: single-column format, no tables, no images, and role-specific keywords.
             </div>
+            {templateMessage ? (
+              <div
+                style={{
+                  marginTop: "0.7rem",
+                  background: "rgba(0,255,136,0.06)",
+                  border: "1px solid rgba(0,255,136,0.2)",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--g)",
+                }}
+              >
+                {templateMessage}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
     </div>
   );
 }
+

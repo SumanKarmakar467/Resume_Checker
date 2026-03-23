@@ -3,7 +3,14 @@ import Navbar from "../components/Navbar";
 
 const API_BASE = "http://localhost:8080/api/resume";
 
-export default function UploadResume({ navigate, setAnalysisResult }) {
+export default function UploadResume({
+  navigate,
+  setAnalysisResult,
+  user,
+  guestAnalyzerUsed,
+  consumeGuestAnalyzerTry,
+  requireAuth,
+}) {
   const [file, setFile] = useState(null);
   const [jobDesc, setJobDesc] = useState("");
   const [loading, setLoading] = useState(false);
@@ -29,6 +36,13 @@ export default function UploadResume({ navigate, setAnalysisResult }) {
 
   const handleAnalyze = async () => {
     if (!file) { setError("Please upload a resume first."); return; }
+    if (!user) {
+      if (guestAnalyzerUsed) {
+        setError("Free analyzer try already used. Please register/login to continue.");
+        requireAuth?.();
+        return;
+      }
+    }
     setLoading(true);
     setError("");
     try {
@@ -42,6 +56,14 @@ export default function UploadResume({ navigate, setAnalysisResult }) {
       });
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
+      if (!user) {
+        const allowed = consumeGuestAnalyzerTry?.();
+        if (!allowed) {
+          setError("Free analyzer try already used. Please register/login to continue.");
+          requireAuth?.();
+          return;
+        }
+      }
       setAnalysisResult(data);
       navigate("result");
     } catch (err) {
@@ -53,7 +75,7 @@ export default function UploadResume({ navigate, setAnalysisResult }) {
 
   return (
     <div>
-      <Navbar navigate={navigate} />
+      <Navbar navigate={navigate} user={user} />
 
       <div
         style={{
@@ -242,6 +264,23 @@ export default function UploadResume({ navigate, setAnalysisResult }) {
             onChange={(e) => setJobDesc(e.target.value)}
           />
         </div>
+
+        {!user && (
+          <div
+            style={{
+              background: "rgba(0,229,255,0.06)",
+              border: "1px solid rgba(0,229,255,0.2)",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              color: "var(--c)",
+              marginBottom: "1rem",
+            }}
+          >
+            guest_limit: analyzer tries left = {guestAnalyzerUsed ? 0 : 1}
+          </div>
+        )}
 
         {/* Error */}
         {error && (

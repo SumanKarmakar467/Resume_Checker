@@ -39,7 +39,16 @@ export default function AuthPage({ navigate, setUser }) {
       const data = await res.json();
       // Store JWT token
       if (data.token) localStorage.setItem("jwt_token", data.token);
-      setUser({ email: form.email, name: form.name || form.email, token: data.token });
+      const authUser = {
+        email: data.email || form.email,
+        name: data.name || form.name || form.email,
+        token: data.token,
+      };
+      localStorage.setItem(
+        "resume_ai_user",
+        JSON.stringify({ email: authUser.email, name: authUser.name })
+      );
+      setUser(authUser);
       navigate("landing");
     } catch (err) {
       setError(err.message || "Authentication failed. Make sure the backend is running.");
