@@ -3,6 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import useTheme from '../hooks/useTheme';
 
+const registerHighlights = [
+  'Email-based authentication with protected dashboard',
+  'Upload resume and auto-fill details from PDF/DOCX/TXT',
+  'Get ATS score, role-fit advice, and downloadable output'
+];
+
 function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,61 +54,100 @@ function Register() {
   };
 
   return (
-    <main className="theme-page min-h-screen px-4 py-10">
-      <div className="mx-auto max-w-lg space-y-4">
-        <header className="flex items-center justify-between">
+    <main className="theme-page auth-page min-h-screen px-4 py-8 md:py-10">
+      <div className="auth-bg" aria-hidden="true">
+        <span className="auth-orb auth-orb-one" />
+        <span className="auth-orb auth-orb-two" />
+        <span className="auth-orb auth-orb-three" />
+      </div>
+
+      <div className="auth-shell mx-auto max-w-5xl">
+        <header className="auth-topbar">
           <Link to="/" className="theme-accent text-sm font-semibold">Back to Home</Link>
           <button type="button" className="theme-toggle" onClick={toggleTheme}>
             {isDark ? 'Light Theme' : 'Dark Theme'}
           </button>
         </header>
 
-        <div className="theme-card p-6">
-          <h1 className="text-2xl font-extrabold">Create your account</h1>
-          <p className="theme-muted mt-1 text-sm">Use email authentication to save resume analyses and track ATS improvements.</p>
+        <section className="auth-grid mt-4">
+          <aside className="auth-showcase auth-animate-slide">
+            <p className="auth-kicker">CREATE ACCOUNT</p>
+            <h1 className="auth-title">Start your ATS resume workflow in under a minute.</h1>
+            <p className="auth-subtitle">
+              Sign up once and keep every resume iteration in one place.
+            </p>
 
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Email address"
-              className="theme-input"
-              required
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password (minimum 6 characters)"
-              className="theme-input"
-              required
-            />
-            <input
-              type="password"
-              value={confirm}
-              onChange={(event) => setConfirm(event.target.value)}
-              placeholder="Confirm password"
-              className="theme-input"
-              required
-            />
+            <div className="auth-chip-row mt-5">
+              <span className="auth-chip">ATS Insights</span>
+              <span className="auth-chip">Role Suggestions</span>
+              <span className="auth-chip">Resume Generator</span>
+            </div>
 
-            {error ? <p className="theme-error">{error}</p> : null}
-            {success ? (
-              <p className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--success-border)', background: 'var(--success-bg)', color: 'var(--success-text)' }}>
-                {success}
-              </p>
-            ) : null}
+            <ul className="auth-points mt-5">
+              {registerHighlights.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </aside>
 
-            <button type="submit" disabled={loading} className="theme-button-primary w-full">
-              {loading ? 'Creating account...' : 'Register'}
-            </button>
-          </form>
+          <div className="theme-card auth-form-card auth-animate-rise">
+            <h2 className="text-2xl font-extrabold">Register</h2>
+            <p className="theme-muted mt-1 text-sm">Create an email account to continue.</p>
 
-          <p className="theme-muted mt-4 text-sm">
-            Already have an account? <Link className="theme-accent font-semibold" to="/login">Log in</Link>
-          </p>
-        </div>
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+              <label className="auth-field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  className="theme-input"
+                  required
+                />
+              </label>
+
+              <label className="auth-field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="At least 6 characters"
+                  className="theme-input"
+                  required
+                />
+              </label>
+
+              <label className="auth-field">
+                <span>Confirm Password</span>
+                <input
+                  type="password"
+                  value={confirm}
+                  onChange={(event) => setConfirm(event.target.value)}
+                  placeholder="Re-enter password"
+                  className="theme-input"
+                  required
+                />
+              </label>
+
+              {error ? <p className="theme-error">{error}</p> : null}
+              {success ? (
+                <p className="rounded-xl border px-3 py-2 text-sm" style={{ borderColor: 'var(--success-border)', background: 'var(--success-bg)', color: 'var(--success-text)' }}>
+                  {success}
+                </p>
+              ) : null}
+
+              <button type="submit" disabled={loading} className="theme-button-primary w-full">
+                {loading ? 'Creating account...' : 'Register'}
+              </button>
+            </form>
+
+            <p className="theme-muted mt-4 text-sm">
+              Already have an account? <Link className="theme-accent font-semibold" to="/login">Log in</Link>
+            </p>
+          </div>
+        </section>
       </div>
     </main>
   );
