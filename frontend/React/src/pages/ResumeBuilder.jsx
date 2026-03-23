@@ -1,7 +1,13 @@
 import { useState } from "react";
+import { jsPDF } from "jspdf";
 import Navbar from "../components/Navbar";
 
 const API_BASE = "http://localhost:8080/api/resume";
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
 
 const STEPS = [
   "Personal Info",
@@ -19,6 +25,216 @@ const EMPTY = {
   skills: { technical: "", tools: "", languages: "" },
   projects: [{ name: "", link: "", desc: "" }],
 };
+
+function normalizeText(text) {
+  return (text || "")
+    .replace(/\r/g, "")
+    .replace(/\t/g, " ")
+    .replace(/[^\x20-\x7E\n]/g, " ")
+    .replace(/[ ]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function pickMatch(text, pattern) {
+  const match = text.match(pattern);
+  return match ? match[0] : "";
+}
+
+function sanitizePdfName(name) {
+  const cleaned = (name || "")
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+    .replace(/\s+/g, "_")
+    .slice(0, 80);
+  return cleaned || "resume_ats_optimized";
+}
+
+function parseUploadedResumeText(rawText) {
+  const text = normalizeText(rawText);
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const firstLine = lines[0] || "";
+
+  const email = pickMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  const phone = pickMatch(
+    text,
+    /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/
+  );
+  const linkedin = pickMatch(text, /https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i);
+  const github = pickMatch(text, /https?:\/\/(?:www\.)?github\.com\/[^\s]+/i);
+
+  const sections = text.split(/\n(?=(experience|education|skills|projects)\s*$)/gim);
+  const fullLower = text.toLowerCase();
+  const experienceStart = fullLower.indexOf("experience");
+  const educationStart = fullLower.indexOf("education");
+  const skillsStart = fullLower.indexOf("skills");
+  const projectsStart = fullLower.indexOf("projects");
+
+  const expText =
+    experienceStart >= 0
+      ? text.slice(
+          experienceStart,
+          [educationStart, skillsStart, projectsStart]
+            .filter((n) => n > experienceStart)
+            .sort((a, b) => a - b)[0] || text.length
+        )
+      : "";
+  const eduText =
+    educationStart >= 0
+      ? text.slice(
+          educationStart,
+          [skillsStart, projectsStart]
+            .filter((n) => n > educationStart)
+            .sort((a, b) => a - b)[0] || text.length
+        )
+      : "";
+  const skillsText =
+    skillsStart >= 0
+      ? text.slice(
+          skillsStart,
+          [projectsStart].filter((n) => n > skillsStart)[0] || text.length
+        )
+      : "";
+  const projectsText = projectsStart >= 0 ? text.slice(projectsStart) : "";
+
+  const expLines = expText.split("\n").map((line) => line.trim()).filter(Boolean);
+  const expHeader = expLines.find((line) => /@|\|/.test(line)) || expLines[1] || "";
+  const expHeaderParts = expHeader.split("|").map((p) => p.trim()).filter(Boolean);
+  let role = "";
+  let company = "";
+  let duration = "";
+  if (expHeader.includes("@")) {
+    const [left, right] = expHeader.split("@").map((p) => p.trim());
+    role = left || "";
+    company = (right || "").split("|")[0]?.trim() || "";
+  } else if (expHeaderParts.length >= 2) {
+    role = expHeaderParts[0] || "";
+    company = expHeaderParts[1] || "";
+    duration = expHeaderParts[2] || "";
+  } else {
+    role = expHeader || "";
+  }
+  if (!duration) {
+    duration = pickMatch(expHeader, /(19|20)\d{2}[^,\n]*/i);
+  }
+  const bullets = expLines
+    .filter((line) => /^[-*]/.test(line) || /^(built|led|developed|implemented|improved|created)/i.test(line))
+    .map((line) => line.replace(/^[-*]\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  const eduLines = eduText.split("\n").map((line) => line.trim()).filter(Boolean);
+  const eduLine = eduLines[1] || eduLines[0] || "";
+  const degree = pickMatch(
+    eduLine,
+    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma)[^,|]*/i
+  );
+  const year = pickMatch(eduLine, /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i);
+  const institute = eduLine
+    .replace(degree, "")
+    .replace(year, "")
+    .replace(/[|,-]/g, " ")
+    .replace(/[ ]{2,}/g, " ")
+    .trim();
+
+  const skillTokens = skillsText
+    .split(/,|\n|\|/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 24);
+
+  const projectLines = projectsText.split("\n").map((line) => line.trim()).filter(Boolean);
+  const projectName = projectLines[1] || projectLines[0] || "";
+  const projectLink = pickMatch(projectsText, /https?:\/\/[^\s]+/i);
+  const projectDesc = projectLines.slice(2, 5).join(" ");
+
+  const maybeName =
+    firstLine.length <= 60 &&
+    !firstLine.includes("@") &&
+    /^[A-Za-z .'-]{3,}$/.test(firstLine)
+      ? firstLine
+      : "";
+
+  return {
+    personal: {
+      name: maybeName,
+      email,
+      phone,
+      location: "",
+      linkedin,
+      github,
+    },
+    experience: [
+      {
+        company,
+        role,
+        duration,
+        bullets: bullets.length ? bullets : ["", ""],
+      },
+    ],
+    education: [
+      {
+        institute,
+        degree,
+        year,
+      },
+    ],
+    skills: {
+      technical: skillTokens.slice(0, 12).join(", "),
+      tools: skillTokens.slice(12, 20).join(", "),
+      languages: "",
+    },
+    projects: [
+      {
+        name: projectName.replace(projectLink, "").trim(),
+        link: projectLink,
+        desc: projectDesc,
+      },
+    ],
+    rawText: text,
+    sectionCount: sections.length,
+  };
+}
+
+function mergeIntoBuilderData(parsed) {
+  return {
+    personal: { ...EMPTY.personal, ...(parsed.personal || {}) },
+    experience:
+      parsed.experience && parsed.experience.length
+        ? parsed.experience
+        : EMPTY.experience,
+    education:
+      parsed.education && parsed.education.length
+        ? parsed.education
+        : EMPTY.education,
+    skills: { ...EMPTY.skills, ...(parsed.skills || {}) },
+    projects:
+      parsed.projects && parsed.projects.length ? parsed.projects : EMPTY.projects,
+  };
+}
+
+function exportTextAsPdf(text, fileName) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 42;
+  const lineHeight = 16;
+  const maxWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const maxHeight = doc.internal.pageSize.getHeight() - margin;
+
+  doc.setFont("times", "normal");
+  doc.setFontSize(11);
+  const lines = doc.splitTextToSize(text || "", maxWidth);
+  let y = margin;
+  lines.forEach((line) => {
+    if (y > maxHeight) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.text(line, margin, y);
+    y += lineHeight;
+  });
+
+  doc.save(`${sanitizePdfName(fileName)}.pdf`);
+}
 
 /* ── STEP FORMS ── */
 function PersonalForm({ data, onChange }) {
@@ -281,17 +497,46 @@ function ProjectsForm({ data, onChange }) {
   );
 }
 
-function ExportStep({ formData, onGenerate, loading, error, generatedResume }) {
+function ExportStep({
+  onGenerate,
+  onDownloadPdf,
+  loading,
+  error,
+  generatedResume,
+  pdfFileName,
+  onPdfFileNameChange,
+  jobDescription,
+  onJobDescriptionChange,
+}) {
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📄</div>
-      <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "0.75rem" }}>
-        Ready to export!
+    <div>
+      <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+        Export ATS Resume
       </h3>
-      <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: "2rem", lineHeight: 1.7 }}>
-        Your resume will be sent to the AI engine for final optimization
-        and exported as an ATS-safe PDF.
+      <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: "1.2rem", lineHeight: 1.7 }}>
+        Generate an improved resume, set a custom PDF name, and download.
       </p>
+
+      <div className="form-group">
+        <label className="form-label">job_description_for_optimization (optional)</label>
+        <textarea
+          className="form-textarea"
+          rows={4}
+          placeholder="Paste target role description to improve keyword matching."
+          value={jobDescription}
+          onChange={(e) => onJobDescriptionChange(e.target.value)}
+        />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">custom_pdf_name</label>
+        <input
+          className="form-input"
+          value={pdfFileName}
+          onChange={(e) => onPdfFileNameChange(e.target.value)}
+          placeholder="resume_ats_optimized"
+        />
+      </div>
 
       {error && (
         <div
@@ -303,11 +548,11 @@ function ExportStep({ formData, onGenerate, loading, error, generatedResume }) {
             fontFamily: "var(--font-mono)",
             fontSize: 12,
             color: "var(--r)",
-            marginBottom: "1.5rem",
+            marginBottom: "1rem",
             textAlign: "left",
           }}
         >
-          ✗ {error}
+          {error}
         </div>
       )}
 
@@ -319,12 +564,12 @@ function ExportStep({ formData, onGenerate, loading, error, generatedResume }) {
               border: "1px solid rgba(0,255,136,0.2)",
               borderRadius: 10,
               padding: "1.25rem",
-              marginBottom: "1.5rem",
+              marginBottom: "1rem",
               fontFamily: "var(--font-mono)",
               fontSize: 12,
               color: "var(--g)",
               textAlign: "left",
-              lineHeight: 1.9,
+              lineHeight: 1.8,
               whiteSpace: "pre-wrap",
               maxHeight: 280,
               overflow: "auto",
@@ -332,35 +577,28 @@ function ExportStep({ formData, onGenerate, loading, error, generatedResume }) {
           >
             {generatedResume}
           </div>
-          <button
-            className="btn-primary"
-            style={{ fontSize: 14 }}
-            onClick={() => {
-              const blob = new Blob([generatedResume], { type: "text/plain" });
-              const a = document.createElement("a");
-              a.href = URL.createObjectURL(blob);
-              a.download = "resume_ats_optimized.txt";
-              a.click();
-            }}
-          >
-            ↓ download_resume()
-          </button>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf}>
+              download_pdf()
+            </button>
+            <button className="btn-secondary" style={{ fontSize: 14 }} onClick={onGenerate} disabled={loading}>
+              regenerate()
+            </button>
+          </div>
         </div>
       ) : (
         <button
           className="btn-primary"
-          style={{ fontSize: 14 }}
+          style={{ width: "100%", justifyContent: "center", fontSize: 14 }}
           onClick={onGenerate}
           disabled={loading}
         >
-          {loading ? "generating with AI..." : "→ generate_&_export()"}
+          {loading ? "generating with AI..." : "generate_ats_resume()"}
         </button>
       )}
     </div>
   );
 }
-
-/* ── LIVE PREVIEW ── */
 function LivePreview({ formData }) {
   const { personal, experience, education, skills, projects } = formData;
   const allSkills = [skills.technical, skills.tools, skills.languages]
@@ -580,53 +818,39 @@ export default function ResumeBuilder({ navigate }) {
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [error, setError] = useState("");
   const [generatedResume, setGeneratedResume] = useState("");
-
-  const handleGenerate = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const resumeText = buildResumeText(formData);
-      const res = await fetch(`${API_BASE}/generate-ats`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText, jobDescription: "" }),
-      });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data = await res.json();
-      setGeneratedResume(data.generatedResume || data.resume || resumeText);
-    } catch (err) {
-      setError(err.message + " — falling back to local export.");
-      setGeneratedResume(buildResumeText(formData));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [existingFile, setExistingFile] = useState(null);
+  const [importMessage, setImportMessage] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [pdfFileName, setPdfFileName] = useState("resume_ats_optimized");
 
   const buildResumeText = (d) => {
     const lines = [];
     const p = d.personal;
     lines.push(p.name || "Your Name");
-    lines.push([p.email, p.phone, p.location, p.github].filter(Boolean).join(" | "));
+    lines.push([p.email, p.phone, p.location, p.linkedin, p.github].filter(Boolean).join(" | "));
     lines.push("");
-    if (d.experience.some((e) => e.role)) {
+
+    if (d.experience.some((e) => e.role || e.company || e.bullets?.some(Boolean))) {
       lines.push("EXPERIENCE");
       lines.push("----------");
       d.experience.forEach((e) => {
-        lines.push(`${e.role} @ ${e.company} | ${e.duration}`);
-        e.bullets.filter(Boolean).forEach((b) => lines.push(`• ${b}`));
+        const header = [e.role, e.company].filter(Boolean).join(" @ ");
+        lines.push([header, e.duration].filter(Boolean).join(" | "));
+        e.bullets.filter(Boolean).forEach((b) => lines.push(`- ${b}`));
         lines.push("");
       });
     }
-    if (d.education.some((e) => e.institute)) {
+
+    if (d.education.some((e) => e.institute || e.degree || e.year)) {
       lines.push("EDUCATION");
       lines.push("---------");
-      d.education.forEach((e) =>
-        lines.push(`${e.institute} | ${e.degree} | ${e.year}`)
-      );
+      d.education.forEach((e) => lines.push([e.institute, e.degree, e.year].filter(Boolean).join(" | ")));
       lines.push("");
     }
+
     const skills = [d.skills.technical, d.skills.tools, d.skills.languages]
       .filter(Boolean)
       .join(", ");
@@ -636,16 +860,143 @@ export default function ResumeBuilder({ navigate }) {
       lines.push(skills);
       lines.push("");
     }
-    if (d.projects.some((p) => p.name)) {
+
+    if (d.projects.some((p) => p.name || p.link || p.desc)) {
       lines.push("PROJECTS");
       lines.push("--------");
       d.projects.forEach((p) => {
-        lines.push(`${p.name} | ${p.link}`);
+        lines.push([p.name, p.link].filter(Boolean).join(" | "));
         if (p.desc) lines.push(p.desc);
         lines.push("");
       });
     }
-    return lines.join("\n");
+
+    return lines.join("\n").trim();
+  };
+
+  const extractTextFromAnalyze = (data) => {
+    if (!data || typeof data !== "object") return "";
+    const directFields = ["resumeText", "extractedText", "parsedText", "content", "rawText"];
+    for (const field of directFields) {
+      if (typeof data[field] === "string" && data[field].trim().length > 40) {
+        return normalizeText(data[field]);
+      }
+    }
+    if (data.sections && typeof data.sections === "object") {
+      const sectionText = Object.values(data.sections)
+        .filter((value) => typeof value === "string")
+        .join("\n");
+      if (sectionText.trim().length > 40) return normalizeText(sectionText);
+    }
+    return "";
+  };
+
+  const generateAtsResume = async (resumeText) => {
+    const res = await fetch(`${API_BASE}/generate-ats`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resumeText,
+        jobDescription: jobDescription.trim(),
+      }),
+    });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    return data.generatedResume || data.resume || resumeText;
+  };
+
+  const readExistingResumeText = async (file) => {
+    if (file.type === "text/plain") {
+      return normalizeText(await file.text());
+    }
+
+    const formDataPayload = new FormData();
+    formDataPayload.append("file", file);
+    if (jobDescription.trim()) {
+      formDataPayload.append("jobDescription", jobDescription.trim());
+    }
+
+    try {
+      const analyzeRes = await fetch(`${API_BASE}/analyze`, {
+        method: "POST",
+        body: formDataPayload,
+      });
+      if (analyzeRes.ok) {
+        const analyzeData = await analyzeRes.json();
+        const extracted = extractTextFromAnalyze(analyzeData);
+        if (extracted) return extracted;
+      }
+    } catch (_e) {
+      // Continue with local fallback.
+    }
+
+    const fallback = normalizeText(await file.text());
+    if (fallback.length < 40) {
+      throw new Error(
+        "Could not extract resume text. For PDF/DOCX, ensure backend analyze response includes extracted text."
+      );
+    }
+    return fallback;
+  };
+
+  const handleImportExisting = async () => {
+    if (!existingFile) {
+      setError("Please select a resume file first.");
+      return;
+    }
+    if (!ACCEPTED_TYPES.includes(existingFile.type)) {
+      setError("Only PDF, DOCX, or TXT files are supported.");
+      return;
+    }
+
+    setImportLoading(true);
+    setError("");
+    setImportMessage("");
+
+    try {
+      const extractedText = await readExistingResumeText(existingFile);
+      const parsed = parseUploadedResumeText(extractedText);
+      const mergedData = mergeIntoBuilderData(parsed);
+      setFormData(mergedData);
+
+      try {
+        const optimizedText = await generateAtsResume(buildResumeText(mergedData));
+        setGeneratedResume(optimizedText);
+      } catch (genErr) {
+        setGeneratedResume(buildResumeText(mergedData));
+        setError(`${genErr.message}. Using local optimized draft.`);
+      }
+
+      setStep(5);
+      setImportMessage("Resume extracted and builder fields auto-filled. Review and download PDF.");
+    } catch (err) {
+      setError(err.message || "Failed to extract data from uploaded resume.");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const resumeText = buildResumeText(formData);
+      const optimized = await generateAtsResume(resumeText);
+      setGeneratedResume(optimized);
+    } catch (err) {
+      setError(`${err.message} - falling back to local export.`);
+      setGeneratedResume(buildResumeText(formData));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!generatedResume.trim()) {
+      setError("Generate resume first, then download PDF.");
+      return;
+    }
+    exportTextAsPdf(generatedResume, pdfFileName);
   };
 
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
@@ -657,8 +1008,7 @@ export default function ResumeBuilder({ navigate }) {
       <div
         style={{ maxWidth: 1120, margin: "0 auto", padding: "3.5rem 2rem" }}
       >
-        {/* Header */}
-        <div style={{ marginBottom: "2.5rem" }}>
+        <div style={{ marginBottom: "1.5rem" }}>
           <div
             style={{
               fontFamily: "var(--font-mono)",
@@ -672,11 +1022,63 @@ export default function ResumeBuilder({ navigate }) {
           <h1
             style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700 }}
           >
-            Build your resume, step by step.
+            Build or improve your resume for a higher ATS score.
           </h1>
         </div>
 
-        {/* Progress Bar */}
+        <div className="card" style={{ marginBottom: "1.5rem" }}>
+          <div className="card-head">import_existing_resume()</div>
+          <div style={{ padding: "1.25rem" }}>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: "0.9rem" }}>
+              Already have a resume? Upload it to extract data, prefill this builder, and generate
+              a stronger ATS-friendly version.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <input
+                className="form-input"
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={(e) => {
+                  setExistingFile(e.target.files?.[0] || null);
+                  setImportMessage("");
+                }}
+                style={{ maxWidth: 420 }}
+              />
+              <button className="btn-primary" onClick={handleImportExisting} disabled={importLoading}>
+                {importLoading ? "extracting..." : "extract_and_prefill()"}
+              </button>
+            </div>
+            {existingFile && (
+              <div
+                style={{
+                  marginTop: "0.6rem",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--muted)",
+                }}
+              >
+                selected: {existingFile.name}
+              </div>
+            )}
+            {importMessage && (
+              <div
+                style={{
+                  marginTop: "0.9rem",
+                  background: "rgba(0,255,136,0.06)",
+                  border: "1px solid rgba(0,255,136,0.2)",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  color: "var(--g)",
+                }}
+              >
+                {importMessage}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div style={{ marginBottom: "2rem" }}>
           <div className="progress-wrap">
             <div className="progress-fill" style={{ width: `${progress}%` }} />
@@ -689,11 +1091,10 @@ export default function ResumeBuilder({ navigate }) {
               marginTop: 6,
             }}
           >
-            step_{step + 1} / {STEPS.length} — {STEPS[step]}
+            step_{step + 1} / {STEPS.length} - {STEPS[step]}
           </div>
         </div>
 
-        {/* Step Tabs */}
         <div
           style={{
             display: "flex",
@@ -720,13 +1121,12 @@ export default function ResumeBuilder({ navigate }) {
               }}
               onClick={() => setStep(i)}
             >
-              {i < step ? "✓ " : ""}
+              {i < step ? "ok " : ""}
               {s.replace(" ", "_").toLowerCase()}
             </button>
           ))}
         </div>
 
-        {/* Main Grid */}
         <div
           style={{
             display: "grid",
@@ -735,7 +1135,6 @@ export default function ResumeBuilder({ navigate }) {
             alignItems: "start",
           }}
         >
-          {/* LEFT: FORM */}
           <div
             className="card"
             style={{ animation: "fadeUp 0.4s ease" }}
@@ -777,15 +1176,18 @@ export default function ResumeBuilder({ navigate }) {
               )}
               {step === 5 && (
                 <ExportStep
-                  formData={formData}
                   onGenerate={handleGenerate}
+                  onDownloadPdf={handleDownloadPdf}
                   loading={loading}
                   error={error}
                   generatedResume={generatedResume}
+                  pdfFileName={pdfFileName}
+                  onPdfFileNameChange={setPdfFileName}
+                  jobDescription={jobDescription}
+                  onJobDescriptionChange={setJobDescription}
                 />
               )}
 
-              {/* Navigation */}
               {step < 5 && (
                 <div
                   style={{
@@ -802,20 +1204,19 @@ export default function ResumeBuilder({ navigate }) {
                     disabled={step === 0}
                     style={{ opacity: step === 0 ? 0.4 : 1 }}
                   >
-                    ← prev()
+                    prev()
                   </button>
                   <button
                     className="btn-primary"
                     onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
                   >
-                    next() →
+                    next()
                   </button>
                 </div>
               )}
             </div>
           </div>
 
-          {/* RIGHT: LIVE PREVIEW */}
           <div>
             <div className="card">
               <div
@@ -834,7 +1235,7 @@ export default function ResumeBuilder({ navigate }) {
                     fontFamily: "var(--font-mono)",
                   }}
                 >
-                  ● ATS-safe format
+                  ATS-safe format
                 </span>
               </div>
               <div style={{ padding: "1.25rem" }}>
@@ -842,7 +1243,6 @@ export default function ResumeBuilder({ navigate }) {
               </div>
             </div>
 
-            {/* ATS tip */}
             <div
               style={{
                 marginTop: "1rem",
@@ -856,8 +1256,7 @@ export default function ResumeBuilder({ navigate }) {
                 lineHeight: 1.8,
               }}
             >
-              💡 ats_tip: single-column format · no tables · no images ·
-              standard section headings · saved automatically
+              ats_tip: single-column format, no tables, no images, and role-specific keywords.
             </div>
           </div>
         </div>
