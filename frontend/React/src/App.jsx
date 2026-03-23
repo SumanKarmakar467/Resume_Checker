@@ -1,76 +1,41 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import UploadResume from './UploadResume';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Landing from './pages/Landing';
-import useAuth from './hooks/useAuth';
+import { useState } from "react";
+import LandingPage from "./pages/LandingPage";
+import UploadResume from "./pages/UploadResume";
+import Result from "./pages/Result";
+import ResumeBuilder from "./pages/ResumeBuilder";
+import AuthPage from "./pages/AuthPage";
+import "./styles/global.css";
 
-function RequireAuth({ children }) {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  return children;
-}
+export default function App() {
+  const [page, setPage] = useState("landing");
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [user, setUser] = useState(null);
 
-function PublicOnly({ children }) {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) {
-    return <Navigate to="/app" replace />;
-  }
-  return children;
-}
+  const navigate = (p) => setPage(p);
 
-function HomeGate() {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) {
-    return <Navigate to="/app" replace />;
-  }
-  return <Landing />;
-}
-
-function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomeGate />} />
-        <Route
-          path="/app"
-          element={(
-            <RequireAuth>
-              <UploadResume />
-            </RequireAuth>
-          )}
+    <div className="app">
+      {page === "landing" && (
+        <LandingPage navigate={navigate} user={user} />
+      )}
+      {page === "upload" && (
+        <UploadResume
+          navigate={navigate}
+          setAnalysisResult={setAnalysisResult}
         />
-        <Route
-          path="/login"
-          element={(
-            <PublicOnly>
-              <Login />
-            </PublicOnly>
-          )}
+      )}
+      {page === "result" && (
+        <Result
+          navigate={navigate}
+          result={analysisResult}
         />
-        <Route
-          path="/register"
-          element={(
-            <PublicOnly>
-              <Register />
-            </PublicOnly>
-          )}
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <RequireAuth>
-              <Dashboard />
-            </RequireAuth>
-          }
-        />
-        <Route path="*" element={<HomeGate />} />
-      </Routes>
-    </BrowserRouter>
+      )}
+      {page === "builder" && (
+        <ResumeBuilder navigate={navigate} user={user} />
+      )}
+      {page === "auth" && (
+        <AuthPage navigate={navigate} setUser={setUser} />
+      )}
+    </div>
   );
 }
-
-export default App;
