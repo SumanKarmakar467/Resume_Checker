@@ -398,7 +398,7 @@ function headingKey(line = '') {
   if (['summary', 'professional summary', 'about', 'about me', 'profile', 'objective'].includes(normalized)) return 'summary';
   if (['skills', 'technical skills', 'core skills', 'tech stack'].includes(normalized)) return 'skills';
   if (['projects', 'project experience', 'key projects'].includes(normalized)) return 'projects';
-  if (['experience', 'work experience', 'professional experience', 'work history'].includes(normalized)) return 'experience';
+  if (['experience', 'work experience', 'professional experience', 'work history', 'internship', 'internships'].includes(normalized)) return 'experience';
   if (['education', 'academic background'].includes(normalized)) return 'education';
   return '';
 }
@@ -435,6 +435,34 @@ function uniqueDetectedSkills(text, words) {
   return words.filter((word) => normalizedText.includes(word));
 }
 
+function defaultProjectPoints(projectName = 'project') {
+  return [
+    `Built ${projectName} with role-aligned features and a production-style workflow.`,
+    'Implemented clean architecture and reusable modules for better maintainability.',
+    'Improved user or system outcomes with measurable delivery and testing discipline.'
+  ];
+}
+
+function parseProjectPoints(rawPoints = [], fallbackDescription = '', projectName = 'project') {
+  const points = rawPoints
+    .map((line) => String(line || '').replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean);
+
+  if (!points.length && fallbackDescription) {
+    const sentencePoints = String(fallbackDescription)
+      .split(/[.;]\s+/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    points.push(...sentencePoints);
+  }
+
+  const compact = points.slice(0, 3);
+  while (compact.length < 3) {
+    compact.push(defaultProjectPoints(projectName)[compact.length]);
+  }
+  return compact;
+}
+
 function parseProjects(projectLines = []) {
   if (!projectLines.length) return [];
 
@@ -444,9 +472,11 @@ function parseProjects(projectLines = []) {
   const flush = () => {
     if (!current) return;
     const description = current.description.join(' ').trim();
+    const descriptionPoints = parseProjectPoints(current.points, description, current.name || 'project');
     projects.push({
       name: current.name || 'Project',
       description,
+      descriptionPoints,
       liveLink: current.liveLink || '',
       sourceCode: current.sourceCode || ''
     });
@@ -457,25 +487,50 @@ function parseProjects(projectLines = []) {
     const line = rawLine.replace(/^[-*]\s*/, '').trim();
     if (!line) continue;
 
-    const url = firstMatch(line, /https?:\/\/\S+/i, '');
-    if (/project/i.test(line) || /^\d+[.)]/.test(rawLine) || /^[A-Z][A-Za-z0-9\s&().+-]{2,50}(\||-|:)/.test(line)) {
+    const urls = deduplicate((line.match(/https?:\/\/\S+/gi) || []));
+    const firstUrl = urls[0] || '';
+    const looksLikeProjectHeading =
+      /project/i.test(line) ||
+      /^\d+[.)]/.test(rawLine) ||
+      /^[A-Z][A-Za-z0-9\s&().+#/-]{2,70}\s[|:]\s/.test(line) ||
+      (/^[A-Z][A-Za-z0-9\s&().+#/-]{2,70}$/.test(line) &&
+        !/^(built|developed|implemented|created|designed|led|improved)\b/i.test(line));
+
+    if (looksLikeProjectHeading) {
       flush();
       const name = line.split(/[|:-]/)[0].trim();
-      current = { name: toTitleCase(name), description: [], liveLink: '', sourceCode: '' };
-      if (url && /github|gitlab/i.test(url)) current.sourceCode = url;
-      else if (url) current.liveLink = url;
+      current = { name: toTitleCase(name), description: [], points: [], liveLink: '', sourceCode: '' };
+      for (const url of urls) {
+        if (/github|gitlab/i.test(url)) {
+          current.sourceCode = current.sourceCode || url;
+        } else if (/source|code/i.test(line) && !current.sourceCode) {
+          current.sourceCode = current.sourceCode || url;
+        } else {
+          current.liveLink = current.liveLink || url;
+        }
+      }
       continue;
     }
 
     if (!current) {
-      current = { name: 'Project', description: [], liveLink: '', sourceCode: '' };
+      current = { name: 'Project', description: [], points: [], liveLink: '', sourceCode: '' };
     }
 
-    if (url) {
-      if (/github|gitlab/i.test(url)) current.sourceCode = current.sourceCode || url;
-      else current.liveLink = current.liveLink || url;
+    if (firstUrl) {
+      for (const url of urls) {
+        if (/github|gitlab/i.test(url)) {
+          current.sourceCode = current.sourceCode || url;
+        } else if (/source|code/i.test(line) && !current.sourceCode) {
+          current.sourceCode = current.sourceCode || url;
+        } else if (/live|demo|portfolio|deploy|website/i.test(line)) {
+          current.liveLink = current.liveLink || url;
+        } else {
+          current.liveLink = current.liveLink || url;
+        }
+      }
     } else {
       current.description.push(line);
+      current.points.push(line);
     }
   }
 
@@ -492,19 +547,30 @@ function parseEducation(educationLines = []) {
 
   return rows.slice(0, 3).map((line) => {
     const yearMatch = line.match(/(19|20)\d{2}/g);
+    const percentage = firstMatch(line, /\d{1,2}(?:\.\d{1,2})?%|\d\.\d{1,2}\s*CGPA/i, '');
+    const boardName = firstMatch(line, /\b(CBSE|ICSE|WBBSE|WBCHSE|State Board|University|Board)\b/i, '');
+
+    const lineWithoutKnownTokens = line
+      .replace(/\b(10th|12th|class\s*10|class\s*12|higher secondary|secondary|b\.?\s*tech|bachelor|undergraduate|b\.?e)\b/ig, ' ')
+      .replace(/\d{1,2}(?:\.\d{1,2})?%|\d\.\d{1,2}\s*CGPA/ig, ' ')
+      .replace(/\b(19|20)\d{2}\b/g, ' ')
+      .replace(/\b(CBSE|ICSE|WBBSE|WBCHSE|State Board|University|Board)\b/ig, ' ')
+      .replace(/[|,()-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     return {
-      level: /b\.tech|bachelor|bsc|be\b/i.test(line)
-        ? 'Undergraduate'
-        : /m\.tech|master|msc/i.test(line)
-          ? 'Postgraduate'
-          : /12|higher secondary/i.test(line)
-            ? '12th'
-            : /10|secondary/i.test(line)
-              ? '10th'
-              : 'Education',
-      board: line,
-      percentage: firstMatch(line, /\b\d{1,2}(?:\.\d{1,2})?%\b|\b\d\.\d{1,2}\s*CGPA\b/i, ''),
-      year: yearMatch ? yearMatch.join(' - ') : ''
+      level: /b\.?\s*tech|bachelor|undergraduate|b\.?e/i.test(line)
+        ? 'B.Tech'
+        : /12th|class\s*12|higher secondary|hsc/i.test(line)
+          ? '12th'
+          : /10th|class\s*10|secondary|ssc/i.test(line)
+            ? '10th'
+            : 'Education',
+      schoolName: lineWithoutKnownTokens || line,
+      boardName: boardName || '',
+      percentage,
+      year: yearMatch ? deduplicate(yearMatch).join(' - ') : ''
     };
   });
 }
@@ -520,18 +586,23 @@ function buildAbout(profile) {
     .slice(0, 6);
 
   const projects = profile.projects.map((project) => project.name).filter(Boolean).slice(0, 2);
+  const hasExperience = String(profile.experience || '').trim().length > 0;
   const role = profile.targetRole || 'software developer';
 
   const parts = [
-    `I am a ${role.toLowerCase()} focused on building production-ready applications with clean, ATS-friendly communication.`
+    `I am a ${role.toLowerCase()} focused on building reliable applications with strong ownership and clear communication.`
   ];
 
   if (topSkills.length) {
-    parts.push(`My core stack includes ${topSkills.join(', ')}.`);
+    parts.push(`My core skills include ${topSkills.join(', ')}.`);
   }
 
   if (projects.length) {
-    parts.push(`Recent work includes ${projects.join(' and ')} with measurable delivery focus.`);
+    parts.push(`Key projects such as ${projects.join(' and ')} highlight practical problem-solving and delivery impact.`);
+  }
+
+  if (hasExperience) {
+    parts.push('I have internship or job exposure and can contribute quickly in team-based development environments.');
   }
 
   return parts.join(' ');
@@ -555,6 +626,9 @@ function extractProfileFromResumeText(resumeText = '', jobDescription = '') {
   const links = deduplicate((cleanText.match(/https?:\/\/[^\s)\]]+/gi) || []));
   const linkedin = links.find((url) => /linkedin\.com/i.test(url)) || '';
   const github = links.find((url) => /github\.com/i.test(url)) || '';
+  const portfolioLine = lines.find((line) => /portfolio/i.test(line) && /https?:\/\//i.test(line)) || '';
+  const portfolioFromLine = firstMatch(portfolioLine, /https?:\/\/[^\s)\]]+/i, '');
+  const portfolio = portfolioFromLine || links.find((url) => /portfolio|\.dev|\.me/i.test(url) && !/linkedin\.com|github\.com/i.test(url)) || '';
 
   const locationLine = lines.find((line) =>
     /,/.test(line) &&
@@ -586,6 +660,7 @@ function extractProfileFromResumeText(resumeText = '', jobDescription = '') {
     location: locationLine || '',
     linkedin,
     github,
+    portfolio,
     targetRole: inferredRole.role,
     summary: summary || '',
     about: '',
@@ -622,61 +697,95 @@ function resumeFromProfile(profile = {}) {
     ['Tools', profile.skills?.tools]
   ].filter(([, value]) => value && value.trim());
 
-  const projectBlocks = (profile.projects || []).slice(0, 4).map((project) => {
-    const bullets = [];
-    if (project.description) bullets.push(`- ${project.description}`);
-    if (project.liveLink) bullets.push(`- Live: ${project.liveLink}`);
-    if (project.sourceCode) bullets.push(`- Code: ${project.sourceCode}`);
-    return `${project.name || 'Project'}\n${bullets.join('\n')}`.trim();
+  const projectBlocks = (profile.projects || []).slice(0, 4).map((project, index) => {
+    const projectName = project.name || `Project ${index + 1}`;
+    const points = parseProjectPoints(project.descriptionPoints || [], project.description, projectName.toLowerCase());
+    return [
+      `PROJECT NAME: ${projectName}`,
+      `LIVE LINK: ${project.liveLink || 'Not specified'}`,
+      `SOURCE CODE: ${project.sourceCode || 'Not specified'}`,
+      'PROJECT DESCRIPTION:',
+      `- ${points[0]}`,
+      `- ${points[1]}`,
+      `- ${points[2]}`
+    ].join('\n');
   });
 
-  const educationBlocks = (profile.education || []).slice(0, 3).map((item) => {
-    const parts = [item.board || item.level || 'Education'];
-    if (item.percentage) parts.push(item.percentage);
-    if (item.year) parts.push(item.year);
-    return `- ${parts.join(' | ')}`;
-  });
+  const educationRows = profile.education || [];
+  const pickEducation = (matcher) => educationRows.find((item) => matcher(String(item.level || item.board || item.schoolName || '').toLowerCase()));
+  const tenth = pickEducation((value) => /10th|class 10|secondary|ssc/.test(value));
+  const twelfth = pickEducation((value) => /12th|class 12|higher secondary|hsc/.test(value));
+  const btech = pickEducation((value) => /b\.?tech|bachelor|undergraduate|b\.?e/.test(value));
+
+  const formatEducationRow = (label, item) => {
+    const percentage = item?.percentage || 'Not specified';
+    const year = item?.year || 'Not specified';
+    const schoolName = item?.schoolName || item?.board || 'Not specified';
+    const boardName = item?.boardName || 'Not specified';
+    return `- ${label}: Percentage: ${percentage} | Year: ${year} | School: ${schoolName} | Board: ${boardName}`;
+  };
+
+  const educationBlocks = [
+    formatEducationRow('10th', tenth),
+    formatEducationRow('12th', twelfth),
+    formatEducationRow('B.Tech', btech)
+  ];
 
   const experienceLines = String(profile.experience || '')
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean)
+    .filter(Boolean);
+  const experienceBullets = experienceLines
+    .filter((line) => /intern|internship|trainee|engineer|developer|associate|analyst|lead|manager|worked|built|developed|implemented/i.test(line))
     .slice(0, 4);
 
-  const contactParts = [profile.email, profile.phone, profile.location, profile.linkedin, profile.github].filter(Boolean);
+  const contactParts = [
+    `Email: ${profile.email || 'Not specified'}`,
+    `Phone: ${profile.phone || 'Not specified'}`,
+    `LinkedIn: ${profile.linkedin || 'Not specified'}`,
+    `GitHub: ${profile.github || 'Not specified'}`,
+    `Portfolio: ${profile.portfolio || 'Not specified'}`
+  ];
 
   let output = '';
   output += `${(profile.fullName || 'Your Name').toUpperCase()}\n`;
   output += `${profile.targetRole || 'SOFTWARE DEVELOPER'}\n`;
-  output += `${contactParts.join(' | ')}\n\n`;
+  output += `${profile.location ? `${profile.location}\n` : ''}`;
+  output += 'CONTACT\n';
+  output += `${contactParts.map((line) => `- ${line}`).join('\n')}\n\n`;
 
-  output += 'ABOUT\n';
+  output += 'ABOUT ME\n';
   output += `${profile.about || profile.summary || 'Professional with strong execution focus and a recruiter-friendly communication style.'}\n\n`;
 
-  output += 'PROFESSIONAL SUMMARY\n';
+  output += 'SUMMARY\n';
   output += `${profile.summary || 'Delivered practical software solutions with measurable outcomes, clear ownership, and collaborative delivery.'}\n\n`;
 
-  output += 'CORE SKILLS\n';
+  output += 'SKILLS\n';
   if (skillsBuckets.length) {
     output += `${skillsBuckets.map(([label, value]) => `- ${label}: ${value}`).join('\n')}\n\n`;
   } else {
     output += '- Add 8-12 role-specific technical keywords here.\n\n';
   }
 
-  output += 'PROJECT EXPERIENCE\n';
-  output += `${projectBlocks.length ? projectBlocks.join('\n\n') : '- Add project name, tech stack, and measurable impact bullets.'}\n\n`;
+  output += 'PROJECTS\n';
+  const fallbackProjectBlock = [
+    'PROJECT NAME: Project Name',
+    'LIVE LINK: Not specified',
+    'SOURCE CODE: Not specified',
+    'PROJECT DESCRIPTION:',
+    '- Built a role-aligned project with practical implementation.',
+    '- Used a clean architecture and reusable components.',
+    '- Improved quality with testing and measurable outcomes.'
+  ].join('\n');
+  output += `${projectBlocks.length ? projectBlocks.join('\n\n') : fallbackProjectBlock}\n\n`;
 
-  output += 'PROFESSIONAL EXPERIENCE\n';
-  if (experienceLines.length) {
-    output += `${experienceLines.map((line) => (line.startsWith('-') ? line : `- ${line}`)).join('\n')}\n\n`;
-  } else {
-    output += '- Built and improved features that increased usability and delivery speed.\n';
-    output += '- Collaborated with stakeholders and shipped production-ready modules.\n';
-    output += '- Documented outcomes with clear impact metrics where possible.\n\n';
+  if (experienceBullets.length) {
+    output += 'EXPERIENCE\n';
+    output += `${experienceBullets.map((line) => (line.startsWith('-') ? line : `- ${line}`)).join('\n')}\n\n`;
   }
 
   output += 'EDUCATION\n';
-  output += `${educationBlocks.length ? educationBlocks.join('\n') : '- Add degree, institution, score, and year.'}`;
+  output += `${educationBlocks.join('\n')}`;
 
   return output.trim();
 }

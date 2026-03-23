@@ -1,8 +1,14 @@
 export default function Navbar({ navigate, user }) {
   return (
     <nav className="navbar">
-      <div className="nav-logo mono" onClick={() => navigate("landing")}>
-        <span style={{ color: "var(--muted)" }}>[&gt;_]</span>&nbsp;
+      <div className="nav-logo mono">
+        <button
+          className="btn-ghost"
+          onClick={() => navigate("landing")}
+          style={{ fontSize: 11, padding: "4px 10px", marginRight: 8 }}
+        >
+          Back
+        </button>
         Resume<span>AI</span>
       </div>
 
