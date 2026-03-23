@@ -1,61 +1,68 @@
-// Purpose: Render an animated ATS score meter with color-coded ring.
-import { useEffect, useMemo, useState } from 'react';
-
-const clampScore = (value) => {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.min(100, Math.round(numeric)));
-};
-
-const scoreColor = (score) => {
-  if (score < 50) return '#EF4444';
-  if (score < 75) return '#F59E0B';
-  return '#22C55E';
-};
-
 function ScoreMeter({ score = 0 }) {
-  const safeScore = useMemo(() => clampScore(score), [score]);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setProgress(safeScore), 40);
-    return () => clearTimeout(timer);
-  }, [safeScore]);
-
-  const radius = 52;
-  const center = 70;
+  const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference - (progress / 100) * circumference;
-  const ringColor = scoreColor(safeScore);
+  const offset = circumference - (score / 100) * circumference;
+
+  const color =
+    score >= 80 ? '#15803d' :
+    score >= 65 ? '#d97706' :
+    '#dc2626';
+
+  const bgColor =
+    score >= 80 ? '#dcfce7' :
+    score >= 65 ? '#fef9c3' :
+    '#fee2e2';
+
+  const label =
+    score >= 80 ? 'Strong' :
+    score >= 65 ? 'Good' :
+    'Needs Work';
 
   return (
-    <div className="flex flex-col items-center">
-      <svg width="140" height="140" role="img" aria-label={`ATS score ${safeScore} out of 100`}>
-        <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--border-color)" strokeWidth="12" />
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-          style={{ transition: 'stroke-dashoffset 1.2s ease-out' }}
-          transform={`rotate(-90 ${center} ${center})`}
-        />
-        <text
-          x="50%"
-          y="50%"
-          textAnchor="middle"
-          dominantBaseline="middle"
-          style={{ fill: ringColor, fontSize: '28px', fontWeight: 800 }}
-        >
-          {safeScore}
-        </text>
-      </svg>
-      <p className="mt-2 text-sm font-semibold">ATS Compatibility Score</p>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ position: 'relative', width: 130, height: 130, margin: '0 auto' }}>
+        <svg width="130" height="130" viewBox="0 0 130 130" style={{ transform: 'rotate(-90deg)' }}>
+          <circle
+            cx="65" cy="65" r={radius}
+            fill="none"
+            stroke="var(--score-track)"
+            strokeWidth="10"
+          />
+          <circle
+            cx="65" cy="65" r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth="10"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="score-meter-ring"
+          />
+        </svg>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center'
+        }}>
+          <span style={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1 }}>{score}</span>
+          <small style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block' }}>/100</small>
+        </div>
+      </div>
+      <div style={{
+        marginTop: 8,
+        display: 'inline-block',
+        background: bgColor,
+        color,
+        border: `1px solid ${color}40`,
+        borderRadius: 20,
+        fontSize: 12,
+        fontWeight: 700,
+        padding: '3px 12px'
+      }}>
+        {label}
+      </div>
     </div>
   );
 }

@@ -1,48 +1,55 @@
-// Purpose: Display section-wise ATS score breakdown with progress bars.
-const scoreColor = (score) => {
-  if (score < 50) return '#EF4444';
-  if (score < 75) return '#F59E0B';
-  return '#22C55E';
-};
-
-const getSectionScore = (sections, name) => {
-  const match = (sections || []).find((section) => section.section === name);
-  return match?.score ?? 0;
-};
-
 function BreakdownCard({ sections = [] }) {
-  const rows = [
-    { label: 'Keywords', key: 'Keyword Match' },
-    { label: 'Skills', key: 'Skills' },
-    { label: 'Experience', key: 'Experience' },
-    { label: 'Formatting', key: 'Formatting' },
-    { label: 'Contact', key: 'Contact Information' }
-  ];
+  if (!sections.length) return null;
+
+  const getBarColor = (score) => {
+    if (score >= 80) return '#22c55e';
+    if (score >= 65) return '#3b82f6';
+    if (score >= 50) return '#f59e0b';
+    return '#ef4444';
+  };
+
+  const getBadgeStyle = (score) => {
+    if (score >= 80) return { background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-border)' };
+    if (score >= 65) return { background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)' };
+    if (score >= 50) return { background: 'var(--warning-bg)', color: 'var(--warning-text)', border: '1px solid var(--warning-border)' };
+    return { background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-border)' };
+  };
 
   return (
-    <section className="mt-5 rounded-2xl border border-[var(--border-color)] bg-[var(--surface-soft)] p-4">
-      <h3 className="text-sm font-bold uppercase tracking-wide">Section-wise Breakdown</h3>
-      <div className="mt-4 space-y-3">
-        {rows.map((row) => {
-          const score = getSectionScore(sections, row.key);
-          const color = scoreColor(score);
+    <div className="theme-card p-5">
+      <h3 className="text-sm font-bold uppercase tracking-wide mb-4" style={{ letterSpacing: '0.6px' }}>
+        Section-wise Score
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {sections.map((section) => {
+          const score = section.score || 0;
           return (
-            <div key={row.key} className="flex items-center gap-3">
-              <span className="w-28 text-sm font-semibold">{row.label}</span>
-              <div className="h-2 flex-1 rounded-full bg-slate-200/70 dark:bg-slate-700/60">
+            <div key={section.section} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', width: 100, flexShrink: 0 }}>
+                {section.section}
+              </span>
+              <div className="breakdown-bar-track">
                 <div
-                  className="h-full rounded-full"
-                  style={{ width: `${score}%`, backgroundColor: color }}
+                  className="breakdown-bar-fill"
+                  style={{ width: `${score}%`, background: getBarColor(score) }}
                 />
               </div>
-              <span className="w-10 text-right text-sm font-semibold" style={{ color }}>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                width: 42,
+                textAlign: 'right',
+                padding: '2px 6px',
+                borderRadius: 6,
+                ...getBadgeStyle(score)
+              }}>
                 {score}
               </span>
             </div>
           );
         })}
       </div>
-    </section>
+    </div>
   );
 }
 

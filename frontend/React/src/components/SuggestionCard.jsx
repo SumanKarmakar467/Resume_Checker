@@ -1,49 +1,96 @@
-// Purpose: Display one AI suggestion with copy action for improved line.
-import { useState } from 'react';
-
 function SuggestionCard({ suggestion }) {
-  const [copied, setCopied] = useState(false);
+  if (!suggestion) return null;
 
-  const handleCopy = async () => {
-    const text = suggestion?.improved_line || suggestion?.improvedLine || '';
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch (_) {
-      setCopied(false);
-    }
-  };
-
-  const weakLine = suggestion?.weak_line || suggestion?.weakLine || '';
-  const improvedLine = suggestion?.improved_line || suggestion?.improvedLine || '';
-  const reason = suggestion?.reason || '';
+  const original = suggestion.originalLine || suggestion.original_line || '';
+  const improved = suggestion.improvedLine || suggestion.improved_line || '';
+  const reason = suggestion.reason || '';
+  const section = suggestion.section || '';
 
   return (
-    <article className="rounded-2xl border border-[var(--border-color)] bg-[var(--surface-soft)] p-4">
-      <div className="space-y-2">
-        <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 dark:border-rose-900/60 dark:bg-rose-950/30">
-          <p className="text-xs font-bold uppercase tracking-wide text-rose-700 dark:text-rose-200">Current</p>
-          <p className="mt-1 text-sm">{weakLine || 'No weak line provided.'}</p>
-        </div>
+    <div className="suggestion-card">
+      {section && (
+        <span style={{
+          display: 'inline-block',
+          background: 'var(--accent-bg)',
+          color: 'var(--accent)',
+          border: '1px solid var(--accent-border)',
+          borderRadius: 20,
+          fontSize: 10,
+          fontWeight: 700,
+          padding: '2px 9px',
+          marginBottom: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.4px'
+        }}>
+          {section}
+        </span>
+      )}
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Suggested</p>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="theme-button-secondary rounded-lg px-2 py-1 text-xs font-semibold"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <p className="mt-1 text-sm">{improvedLine || 'No improved line provided.'}</p>
+      {original && (
+        <div style={{ marginBottom: 10 }}>
+          <p style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: 'var(--error-text)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.4px',
+            marginBottom: 4
+          }}>
+            Current
+          </p>
+          <p style={{
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            background: 'var(--error-bg)',
+            border: '1px solid var(--error-border)',
+            borderRadius: 8,
+            padding: '8px 10px',
+            lineHeight: 1.6
+          }}>
+            {original}
+          </p>
         </div>
-      </div>
-      <p className="theme-muted mt-3 text-sm">{reason || 'No reason provided.'}</p>
-    </article>
+      )}
+
+      {improved && (
+        <div style={{ marginBottom: 10 }}>
+          <p style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: 'var(--success-text)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.4px',
+            marginBottom: 4
+          }}>
+            Suggested
+          </p>
+          <p style={{
+            fontSize: 12,
+            color: 'var(--text-secondary)',
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success-border)',
+            borderRadius: 8,
+            padding: '8px 10px',
+            lineHeight: 1.6
+          }}>
+            {improved}
+          </p>
+        </div>
+      )}
+
+      {reason && (
+        <p style={{
+          fontSize: 11,
+          color: 'var(--text-muted)',
+          lineHeight: 1.6,
+          borderTop: '1px solid var(--border-color)',
+          paddingTop: 8,
+          marginTop: 4
+        }}>
+          {reason}
+        </p>
+      )}
+    </div>
   );
 }
 

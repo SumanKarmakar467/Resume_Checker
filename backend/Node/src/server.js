@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const resumeRoutes = require('./routes/resumeRoutes');
+const authRoutes = require('./routes/authRoutes');
+const historyRoutes = require('./routes/historyRoutes');
 const { connectDb } = require('./config/db');
 
 dotenv.config();
@@ -34,10 +36,12 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use('/api/auth', authRoutes);
+app.use('/api/history', historyRoutes);
 app.use('/api/resume', resumeRoutes);
 
 app.use((err, req, res, next) => {
-  if (err && err.message && err.message.includes('Only PDF and DOCX files')) {
+  if (err && err.message && /Only PDF/i.test(err.message)) {
     return res.status(400).json({ error: err.message });
   }
 

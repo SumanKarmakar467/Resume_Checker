@@ -11,9 +11,10 @@ const upload = multer({
     const isDocx =
       file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       fileName.endsWith('.docx');
+    const isTxt = file.mimetype === 'text/plain' || fileName.endsWith('.txt');
 
-    if (!isPdf && !isDocx) {
-      cb(new Error('Only PDF and DOCX files are supported.'));
+    if (!isPdf && !isDocx && !isTxt) {
+      cb(new Error('Only PDF, DOCX, and TXT files are supported.'));
       return;
     }
     cb(null, true);

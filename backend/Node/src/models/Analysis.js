@@ -13,10 +13,20 @@ const sectionFeedbackSchema = new mongoose.Schema(
 
 const analysisSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.Mixed,
+      index: true,
+      default: null
+    },
+    resumeFileName: String,
+    jobTitle: String,
+    atsScore: Number,
     overallScore: Number,
     sections: [sectionFeedbackSchema],
     matchedKeywords: [String],
     missingKeywords: [String],
+    bestFitRole: String,
+    roleSuggestion: String,
     panelScores: {
       contentScore: Number,
       sectionsScore: Number,
