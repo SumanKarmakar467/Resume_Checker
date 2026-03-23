@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
@@ -43,30 +43,87 @@ const RESUME_TEMPLATES = [
     id: "ats_clean",
     name: "ATS Clean",
     description: "Single-column ATS-safe layout with clear sections.",
+    useCase: "Best for software, analytics, and corporate roles.",
     primary: "#0f766e",
     background: "#ffffff",
     text: "#111827",
     sectionBg: "#f8fafc",
+    sideBg: "#f0fdfa",
+    border: "#99f6e4",
   },
   {
     id: "modern_split",
     name: "Modern Split",
     description: "Two-column professional template with subtle color accents.",
+    useCase: "Best for product, UI, and full-stack profiles.",
     primary: "#1d4ed8",
     background: "#ffffff",
     text: "#0f172a",
     sectionBg: "#eff6ff",
+    sideBg: "#eff6ff",
+    border: "#bfdbfe",
   },
   {
     id: "executive",
     name: "Executive",
     description: "Balanced premium look with elegant typography and spacing.",
+    useCase: "Best for senior and leadership applications.",
     primary: "#7c2d12",
     background: "#fffdf7",
     text: "#1f2937",
     sectionBg: "#fffbeb",
+    sideBg: "#fff7ed",
+    border: "#fdba74",
+  },
+  {
+    id: "minimal_mono",
+    name: "Minimal Mono",
+    description: "Compact ATS layout with strong hierarchy and dense content fit.",
+    useCase: "Best for freshers and internship applications.",
+    primary: "#1f2937",
+    background: "#ffffff",
+    text: "#111827",
+    sectionBg: "#f3f4f6",
+    sideBg: "#f9fafb",
+    border: "#d1d5db",
+  },
+  {
+    id: "impact_edge",
+    name: "Impact Edge",
+    description: "Bold accent strips and achievement-focused section styling.",
+    useCase: "Best for marketing, sales, and growth roles.",
+    primary: "#be123c",
+    background: "#fffdfd",
+    text: "#1f2937",
+    sectionBg: "#fff1f2",
+    sideBg: "#ffe4e6",
+    border: "#fda4af",
+  },
+  {
+    id: "tech_blueprint",
+    name: "Tech Blueprint",
+    description: "Structured, engineering-first layout with precise visual rhythm.",
+    useCase: "Best for backend, DevOps, and data engineering roles.",
+    primary: "#0f766e",
+    background: "#f8fafc",
+    text: "#0f172a",
+    sectionBg: "#ecfeff",
+    sideBg: "#cffafe",
+    border: "#67e8f9",
   },
 ];
+
+const ONE_PAGE_LIMITS = {
+  summary: 320,
+  headline: 90,
+  experienceItems: 3,
+  bulletsPerExperience: 3,
+  bulletChars: 130,
+  educationItems: 2,
+  projects: 2,
+  projectDescChars: 155,
+  skills: 20,
+};
 
 function normalizeText(text) {
   return (text || "")
@@ -90,6 +147,100 @@ function sanitizePdfName(name) {
     .replace(/\s+/g, "_")
     .slice(0, 80);
   return cleaned || "resume_ats_optimized";
+}
+
+function shortenText(value, maxLength) {
+  const normalized = String(value || "").replace(/[ ]{2,}/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+}
+
+function parseSkillTokens(skills) {
+  return [skills.technical, skills.tools, skills.languages]
+    .filter(Boolean)
+    .join(",")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function compactResumeForOnePage(data) {
+  let trimmed = false;
+  const markTrim = (condition) => {
+    if (condition) trimmed = true;
+  };
+
+  const source = data || EMPTY;
+  const skillTokens = parseSkillTokens(source.skills);
+  const trimmedSkills = skillTokens.slice(0, ONE_PAGE_LIMITS.skills);
+  markTrim(trimmedSkills.length < skillTokens.length);
+
+  const personal = {
+    ...source.personal,
+    headline: shortenText(source.personal.headline, ONE_PAGE_LIMITS.headline),
+    summary: shortenText(source.personal.summary, ONE_PAGE_LIMITS.summary),
+  };
+  markTrim(personal.headline !== (source.personal.headline || "").trim());
+  markTrim(personal.summary !== (source.personal.summary || "").trim());
+
+  const experienceInput = source.experience || [];
+  const experience = experienceInput
+    .filter((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean))
+    .slice(0, ONE_PAGE_LIMITS.experienceItems)
+    .map((item) => {
+      const bulletsInput = (item.bullets || []).filter(Boolean);
+      const bullets = bulletsInput
+        .slice(0, ONE_PAGE_LIMITS.bulletsPerExperience)
+        .map((bullet) => shortenText(bullet, ONE_PAGE_LIMITS.bulletChars));
+      markTrim(bullets.length < bulletsInput.length);
+      return {
+        ...item,
+        role: shortenText(item.role, 56),
+        company: shortenText(item.company, 56),
+        duration: shortenText(item.duration, 30),
+        bullets,
+      };
+    });
+  markTrim(experience.length < experienceInput.filter((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean)).length);
+
+  const educationInput = source.education || [];
+  const education = educationInput
+    .filter((item) => item.institute || item.degree || item.year)
+    .slice(0, ONE_PAGE_LIMITS.educationItems)
+    .map((item) => ({
+      ...item,
+      institute: shortenText(item.institute, 70),
+      degree: shortenText(item.degree, 56),
+      year: shortenText(item.year, 30),
+    }));
+  markTrim(education.length < educationInput.filter((item) => item.institute || item.degree || item.year).length);
+
+  const projectsInput = source.projects || [];
+  const projects = projectsInput
+    .filter((item) => item.name || item.link || item.desc)
+    .slice(0, ONE_PAGE_LIMITS.projects)
+    .map((item) => ({
+      ...item,
+      name: shortenText(item.name, 48),
+      link: shortenText(item.link, 58),
+      desc: shortenText(item.desc, ONE_PAGE_LIMITS.projectDescChars),
+    }));
+  markTrim(projects.length < projectsInput.filter((item) => item.name || item.link || item.desc).length);
+
+  return {
+    trimmed,
+    data: {
+      personal,
+      experience: experience.length ? experience : EMPTY.experience,
+      education: education.length ? education : EMPTY.education,
+      skills: {
+        technical: trimmedSkills.slice(0, 8).join(", "),
+        tools: trimmedSkills.slice(8, 14).join(", "),
+        languages: trimmedSkills.slice(14).join(", "),
+      },
+      projects: projects.length ? projects : EMPTY.projects,
+    },
+  };
 }
 
 function parseUploadedResumeText(rawText) {
@@ -274,24 +425,21 @@ async function exportNodeAsPdf(node, fileName) {
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgHeight = (canvas.height * pageWidth) / canvas.width;
+  const margin = 20;
+  const maxWidth = pageWidth - margin * 2;
+  const maxHeight = pageHeight - margin * 2;
+  const fitRatio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+  const renderWidth = canvas.width * fitRatio;
+  const renderHeight = canvas.height * fitRatio;
+  const x = (pageWidth - renderWidth) / 2;
+  const y = (pageHeight - renderHeight) / 2;
 
-  let heightLeft = imgHeight;
-  let position = 0;
-  pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, pageWidth, imgHeight);
-    heightLeft -= pageHeight;
-  }
+  pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
 
-/* ── STEP FORMS ── */
+/* STEP FORMS */
 function PersonalForm({ data, onChange }) {
   const fields = [
     ["name", "full_name", "text", "Suman Karmakar"],
@@ -425,7 +573,7 @@ function ExperienceForm({ data, onChange }) {
                   <input
                     className="form-input"
                     placeholder={
-                      field === "duration" ? "Jun 2023 – Present" : ""
+                      field === "duration" ? "Jun 2023 - Present" : ""
                     }
                     value={exp[field]}
                     onChange={(e) => update(i, field, e.target.value)}
@@ -539,7 +687,7 @@ function SkillsForm({ data, onChange }) {
           lineHeight: 1.8,
         }}
       >
-        💡 tip: separate skills with commas. ATS reads comma-separated lists best.
+        tip: separate skills with commas. ATS reads comma-separated lists best.
       </div>
     </div>
   );
@@ -623,6 +771,7 @@ function ExportStep({
   onJobDescriptionChange,
   selectedTemplate,
   onTemplateChange,
+  onePageTrimmed,
 }) {
   return (
     <div>
@@ -638,8 +787,8 @@ function ExportStep({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-            gap: "0.6rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+            gap: "0.7rem",
           }}
         >
           {RESUME_TEMPLATES.map((template) => (
@@ -650,18 +799,71 @@ function ExportStep({
               style={{
                 borderRadius: 10,
                 border: `1px solid ${selectedTemplate === template.id ? template.primary : "var(--border)"}`,
-                background: selectedTemplate === template.id ? `${template.primary}22` : "var(--d3)",
-                color: selectedTemplate === template.id ? "#ffffff" : "var(--text)",
-                padding: "10px",
+                background: selectedTemplate === template.id ? `${template.primary}1A` : "var(--d3)",
+                color: "var(--text-primary)",
+                padding: "10px 11px",
                 textAlign: "left",
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 12 }}>{template.name}</div>
-              <div style={{ fontSize: 11, opacity: 0.86, marginTop: 4 }}>{template.description}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 999,
+                    background: template.primary,
+                    border: "1px solid rgba(15,23,42,0.2)",
+                  }}
+                />
+                <div style={{ fontWeight: 700, fontSize: 12 }}>{template.name}</div>
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.92, marginTop: 5, color: "var(--muted)", lineHeight: 1.55 }}>
+                {template.description}
+              </div>
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 10.5,
+                  fontFamily: "var(--font-mono)",
+                  color: selectedTemplate === template.id ? template.primary : "var(--muted)",
+                }}
+              >
+                best_for: {template.useCase}
+              </div>
             </button>
           ))}
         </div>
+        <div
+          style={{
+            marginTop: 8,
+            background: "rgba(0,255,136,0.06)",
+            border: "1px solid rgba(0,255,136,0.18)",
+            borderRadius: 8,
+            padding: "8px 10px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10.5,
+            color: "var(--g)",
+          }}
+        >
+          one_page_mode: enabled (PDF export is always 1 page)
+        </div>
+        {onePageTrimmed ? (
+          <div
+            style={{
+              marginTop: 8,
+              background: "rgba(245,158,11,0.08)",
+              border: "1px solid rgba(245,158,11,0.25)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              color: "var(--warning-text)",
+            }}
+          >
+            note: extra content is auto-trimmed in preview/export to keep one page.
+          </div>
+        ) : null}
       </div>
 
       <div className="form-group">
@@ -749,25 +951,32 @@ function ExportStep({
 function LivePreview({ formData, selectedTemplate }) {
   const { personal, experience, education, skills, projects } = formData;
   const template = RESUME_TEMPLATES.find((item) => item.id === selectedTemplate) || RESUME_TEMPLATES[0];
+  const allSkills = parseSkillTokens(skills);
 
-  const allSkills = [skills.technical, skills.tools, skills.languages]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const pageShell = {
+    background: template.background,
+    color: template.text,
+    fontSize: 10.6,
+    lineHeight: 1.52,
+    borderRadius: 8,
+    border: `1px solid ${template.border}`,
+    overflow: "hidden",
+    width: "100%",
+    aspectRatio: "210 / 297",
+    boxShadow: "0 8px 18px rgba(2, 6, 23, 0.08)",
+  };
 
   const sectionTitle = (label) => (
     <div
       style={{
-        fontSize: 11,
-        fontWeight: 700,
+        fontSize: 10.2,
+        fontWeight: 800,
         textTransform: "uppercase",
-        letterSpacing: 0.8,
+        letterSpacing: 0.7,
         color: template.primary,
-        borderBottom: `2px solid ${template.primary}`,
-        paddingBottom: 3,
-        margin: "14px 0 8px",
+        borderBottom: `1.5px solid ${template.primary}`,
+        paddingBottom: 2,
+        margin: "10px 0 6px",
       }}
     >
       {label}
@@ -776,33 +985,22 @@ function LivePreview({ formData, selectedTemplate }) {
 
   if (template.id === "modern_split") {
     return (
-      <div
-        style={{
-          background: template.background,
-          color: template.text,
-          fontSize: 11,
-          lineHeight: 1.6,
-          borderRadius: 8,
-          minHeight: 720,
-          border: "1px solid #dbeafe",
-          overflow: "hidden",
-        }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr", minHeight: 720 }}>
-          <div style={{ background: "#eff6ff", padding: "18px 14px" }}>
+      <div style={pageShell}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr", height: "100%" }}>
+          <div style={{ background: template.sideBg, padding: "16px 12px" }}>
             {personal.photoUrl ? (
               <img
                 src={personal.photoUrl}
                 alt="profile"
-                style={{ width: 90, height: 90, objectFit: "cover", borderRadius: "50%", marginBottom: 12 }}
+                style={{ width: 74, height: 74, objectFit: "cover", borderRadius: "50%", marginBottom: 10 }}
               />
             ) : null}
-            <div style={{ fontSize: 10, color: "#1e3a8a", marginBottom: 4, fontWeight: 700 }}>CONTACT</div>
-            <div style={{ fontSize: 10 }}>{personal.email}</div>
-            <div style={{ fontSize: 10 }}>{personal.phone}</div>
-            <div style={{ fontSize: 10 }}>{personal.location}</div>
-            <div style={{ fontSize: 10 }}>{personal.linkedin}</div>
-            <div style={{ fontSize: 10 }}>{personal.github}</div>
+            <div style={{ fontSize: 9.5, color: template.primary, marginBottom: 4, fontWeight: 800 }}>CONTACT</div>
+            <div style={{ fontSize: 9.2 }}>{personal.email}</div>
+            <div style={{ fontSize: 9.2 }}>{personal.phone}</div>
+            <div style={{ fontSize: 9.2 }}>{personal.location}</div>
+            <div style={{ fontSize: 9.2 }}>{personal.linkedin}</div>
+            <div style={{ fontSize: 9.2 }}>{personal.github}</div>
 
             {sectionTitle("Skills")}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
@@ -810,12 +1008,12 @@ function LivePreview({ formData, selectedTemplate }) {
                 <span
                   key={item}
                   style={{
-                    fontSize: 9,
-                    background: "#dbeafe",
-                    color: "#1e3a8a",
+                    fontSize: 8.8,
+                    background: template.sectionBg,
+                    color: template.primary,
                     borderRadius: 12,
-                    padding: "2px 8px",
-                    border: "1px solid #bfdbfe",
+                    padding: "2px 7px",
+                    border: `1px solid ${template.primary}4D`,
                   }}
                 >
                   {item}
@@ -824,26 +1022,26 @@ function LivePreview({ formData, selectedTemplate }) {
             </div>
           </div>
 
-          <div style={{ padding: "20px 18px" }}>
-            <div style={{ fontSize: 24, fontWeight: 800, color: "#1d4ed8", lineHeight: 1.1 }}>
+          <div style={{ padding: "16px 14px" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: template.primary, lineHeight: 1.08 }}>
               {personal.name || "Your Name"}
             </div>
             {personal.headline ? (
-              <div style={{ fontSize: 12, marginTop: 4, color: "#1f2937", fontWeight: 600 }}>{personal.headline}</div>
+              <div style={{ fontSize: 10.8, marginTop: 3, color: template.text, fontWeight: 700 }}>{personal.headline}</div>
             ) : null}
             {personal.summary ? (
-              <div style={{ marginTop: 10, fontSize: 10.5, color: "#334155" }}>{personal.summary}</div>
+              <div style={{ marginTop: 8, fontSize: 9.6, color: "#334155" }}>{personal.summary}</div>
             ) : null}
 
             {sectionTitle("Experience")}
             {experience.map((item, i) => (
-              <div key={`exp-${i}`} style={{ marginBottom: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: 11 }}>{item.role || "Role"}</div>
-                <div style={{ fontSize: 10, color: "#475569" }}>
+              <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
+                <div style={{ fontWeight: 700, fontSize: 10.2 }}>{item.role || "Role"}</div>
+                <div style={{ fontSize: 9.3, color: "#475569" }}>
                   {[item.company, item.duration].filter(Boolean).join(" | ")}
                 </div>
                 {item.bullets.filter(Boolean).map((bullet, idx) => (
-                  <div key={`b-${idx}`} style={{ fontSize: 10, color: "#334155", marginTop: 3 }}>
+                  <div key={`b-${idx}`} style={{ fontSize: 9.2, color: "#334155", marginTop: 2.5 }}>
                     - {bullet}
                   </div>
                 ))}
@@ -852,18 +1050,18 @@ function LivePreview({ formData, selectedTemplate }) {
 
             {sectionTitle("Education")}
             {education.map((item, i) => (
-              <div key={`edu-${i}`} style={{ fontSize: 10.5, marginBottom: 5 }}>
+              <div key={`edu-${i}`} style={{ fontSize: 9.4, marginBottom: 4 }}>
                 <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
               </div>
             ))}
 
             {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
             {projects.map((item, i) => (
-              <div key={`project-${i}`} style={{ marginBottom: 6 }}>
-                <div style={{ fontWeight: 700, fontSize: 10.5 }}>
+              <div key={`project-${i}`} style={{ marginBottom: 5 }}>
+                <div style={{ fontWeight: 700, fontSize: 9.4 }}>
                   {[item.name, item.link].filter(Boolean).join(" | ")}
                 </div>
-                <div style={{ fontSize: 10, color: "#374151" }}>{item.desc}</div>
+                <div style={{ fontSize: 9.1, color: "#374151" }}>{item.desc}</div>
               </div>
             ))}
           </div>
@@ -872,31 +1070,35 @@ function LivePreview({ formData, selectedTemplate }) {
     );
   }
 
+  const compactHeader = template.id === "minimal_mono" || template.id === "tech_blueprint";
+
   return (
-    <div
-      style={{
-        background: template.background,
-        borderRadius: 8,
-        padding: "1.4rem",
-        color: template.text,
-        fontSize: 11,
-        lineHeight: 1.7,
-        minHeight: 720,
-        border: `1px solid ${template.id === "executive" ? "#fed7aa" : "#d1fae5"}`,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 14, borderBottom: `3px solid ${template.primary}`, paddingBottom: 10 }}>
+    <div style={{ ...pageShell, padding: compactHeader ? "0.95rem 1rem" : "1.15rem 1.1rem" }}>
+      {template.id === "impact_edge" ? (
+        <div
+          style={{
+            height: 6,
+            borderRadius: 999,
+            background: `linear-gradient(90deg, ${template.primary}, #fb7185)`,
+            marginBottom: 8,
+          }}
+        />
+      ) : null}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 11, borderBottom: `2px solid ${template.primary}`, paddingBottom: 8 }}>
         {personal.photoUrl ? (
           <img
             src={personal.photoUrl}
             alt="profile"
-            style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: `2px solid ${template.primary}` }}
+            style={{ width: compactHeader ? 58 : 64, height: compactHeader ? 58 : 64, borderRadius: "50%", objectFit: "cover", border: `2px solid ${template.primary}` }}
           />
         ) : null}
         <div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: template.primary }}>{personal.name || "Your Name"}</div>
-          {personal.headline ? <div style={{ fontSize: 12, fontWeight: 600 }}>{personal.headline}</div> : null}
-          <div style={{ fontSize: 10.5, marginTop: 3, color: "#4b5563" }}>
+          <div style={{ fontSize: compactHeader ? 20 : 22, fontWeight: 800, color: template.primary, lineHeight: 1.1 }}>
+            {personal.name || "Your Name"}
+          </div>
+          {personal.headline ? <div style={{ fontSize: 10.6, fontWeight: 700 }}>{personal.headline}</div> : null}
+          <div style={{ fontSize: 9.1, marginTop: 3, color: "#4b5563" }}>
             {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github]
               .filter(Boolean)
               .join(" | ")}
@@ -905,20 +1107,20 @@ function LivePreview({ formData, selectedTemplate }) {
       </div>
 
       {personal.summary ? (
-        <div style={{ marginTop: 10, background: template.sectionBg, borderRadius: 8, padding: "10px 12px", color: "#374151" }}>
+        <div style={{ marginTop: 8, background: template.sectionBg, borderRadius: 7, padding: "8px 10px", color: "#374151", fontSize: 9.5 }}>
           {personal.summary}
         </div>
       ) : null}
 
       {sectionTitle("Experience")}
       {experience.map((item, i) => (
-        <div key={`exp-${i}`} style={{ marginBottom: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 11.5 }}>{item.role || "Role"}</div>
-          <div style={{ fontSize: 10.5, color: "#4b5563" }}>
+        <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
+          <div style={{ fontWeight: 700, fontSize: 10.1 }}>{item.role || "Role"}</div>
+          <div style={{ fontSize: 9.1, color: "#4b5563" }}>
             {[item.company, item.duration].filter(Boolean).join(" | ")}
           </div>
           {item.bullets.filter(Boolean).map((bullet, idx) => (
-            <div key={`bullet-${idx}`} style={{ fontSize: 10.5, color: "#374151", marginTop: 3 }}>
+            <div key={`bullet-${idx}`} style={{ fontSize: 9.2, color: "#374151", marginTop: 2.5 }}>
               - {bullet}
             </div>
           ))}
@@ -927,23 +1129,23 @@ function LivePreview({ formData, selectedTemplate }) {
 
       {sectionTitle("Education")}
       {education.map((item, i) => (
-        <div key={`edu-${i}`} style={{ marginBottom: 5, fontSize: 10.5 }}>
+        <div key={`edu-${i}`} style={{ marginBottom: 4, fontSize: 9.2 }}>
           <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
         </div>
       ))}
 
       {allSkills.length ? sectionTitle("Skills") : null}
       {allSkills.length ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {allSkills.map((item) => (
             <span
               key={item}
               style={{
-                fontSize: 9.5,
+                fontSize: 8.8,
                 background: template.sectionBg,
                 border: `1px solid ${template.primary}55`,
                 color: template.primary,
-                padding: "2px 8px",
+                padding: "1.5px 7px",
                 borderRadius: 12,
               }}
             >
@@ -955,9 +1157,9 @@ function LivePreview({ formData, selectedTemplate }) {
 
       {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
       {projects.map((item, i) => (
-        <div key={`project-${i}`} style={{ marginBottom: 7 }}>
-          <div style={{ fontWeight: 700, fontSize: 10.5 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
-          <div style={{ fontSize: 10, color: "#374151" }}>{item.desc}</div>
+        <div key={`project-${i}`} style={{ marginBottom: 5.5 }}>
+          <div style={{ fontWeight: 700, fontSize: 9.3 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
+          <div style={{ fontSize: 8.95, color: "#374151" }}>{item.desc}</div>
         </div>
       ))}
     </div>
@@ -985,6 +1187,7 @@ export default function ResumeBuilder({
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [templateMessage, setTemplateMessage] = useState("");
   const previewRef = useRef(null);
+  const onePagePreview = useMemo(() => compactResumeForOnePage(formData), [formData]);
 
   const buildResumeText = (d) => {
     const lines = [];
@@ -1140,6 +1343,7 @@ export default function ResumeBuilder({
       const extractedText = await readExistingResumeText(existingFile);
       const parsed = parseUploadedResumeText(extractedText);
       const mergedData = mergeIntoBuilderData(parsed);
+      const importedOnePage = compactResumeForOnePage(mergedData);
       setFormData(mergedData);
 
       if (!consumeBuilderGuestTryOrRedirect()) {
@@ -1147,15 +1351,15 @@ export default function ResumeBuilder({
       }
 
       try {
-        const optimizedText = await generateAtsResume(buildResumeText(mergedData));
+        const optimizedText = await generateAtsResume(buildResumeText(importedOnePage.data));
         setGeneratedResume(optimizedText);
       } catch (genErr) {
-        setGeneratedResume(buildResumeText(mergedData));
+        setGeneratedResume(buildResumeText(importedOnePage.data));
         setError(`${genErr.message}. Using local optimized draft.`);
       }
 
       setStep(5);
-      setImportMessage("Resume extracted and builder fields auto-filled. Review and download PDF.");
+      setImportMessage("Resume extracted and auto-filled. One-page preview is ready for template selection and download.");
     } catch (err) {
       setError(err.message || "Failed to extract data from uploaded resume.");
     } finally {
@@ -1170,12 +1374,12 @@ export default function ResumeBuilder({
     setLoading(true);
     setError("");
     try {
-      const resumeText = buildResumeText(formData);
+      const resumeText = buildResumeText(onePagePreview.data);
       const optimized = await generateAtsResume(resumeText);
       setGeneratedResume(optimized);
     } catch (err) {
       setError(`${err.message} - falling back to local export.`);
-      setGeneratedResume(buildResumeText(formData));
+      setGeneratedResume(buildResumeText(onePagePreview.data));
     } finally {
       setLoading(false);
     }
@@ -1194,7 +1398,7 @@ export default function ResumeBuilder({
       setIsExportingPdf(true);
       setTemplateMessage("");
       await exportNodeAsPdf(previewRef.current, pdfFileName);
-      setTemplateMessage("Styled resume PDF downloaded successfully.");
+      setTemplateMessage("One-page resume PDF downloaded successfully.");
     } catch (_err) {
       setError("Could not generate styled PDF. Please try again.");
     } finally {
@@ -1407,6 +1611,7 @@ export default function ResumeBuilder({
                   onJobDescriptionChange={setJobDescription}
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
+                  onePageTrimmed={onePagePreview.trimmed}
                 />
               )}
 
@@ -1460,9 +1665,9 @@ export default function ResumeBuilder({
                   ATS-safe format
                 </span>
               </div>
-              <div style={{ padding: "1.25rem" }}>
-                <div ref={previewRef}>
-                  <LivePreview formData={formData} selectedTemplate={selectedTemplate} />
+              <div style={{ padding: "1.25rem", overflowX: "auto" }}>
+                <div ref={previewRef} style={{ minWidth: 320 }}>
+                  <LivePreview formData={onePagePreview.data} selectedTemplate={selectedTemplate} />
                 </div>
               </div>
             </div>
@@ -1480,7 +1685,7 @@ export default function ResumeBuilder({
                 lineHeight: 1.8,
               }}
             >
-              ats_tip: single-column format, no tables, no images, and role-specific keywords.
+              ats_tip: one page only, concise bullets, role-specific keywords, and clean section hierarchy.
             </div>
             {templateMessage ? (
               <div
@@ -1504,4 +1709,3 @@ export default function ResumeBuilder({
     </div>
   );
 }
-
