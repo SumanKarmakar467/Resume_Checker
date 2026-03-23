@@ -125,6 +125,72 @@ const ONE_PAGE_LIMITS = {
   skills: 20,
 };
 
+const SECTION_COMPARE_RULES = [
+  {
+    id: "contact",
+    label: "Contact Info",
+    tip: "Add email, phone, and profile links in the header.",
+    test: (text) =>
+      /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text) &&
+      (/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/.test(text) ||
+        /(linkedin|github)/i.test(text)),
+  },
+  {
+    id: "summary",
+    label: "Summary / Objective",
+    tip: "Keep a short summary aligned to your target role.",
+    test: (text) => /\b(summary|professional summary|objective|profile|about)\b/i.test(text),
+  },
+  {
+    id: "experience",
+    label: "Experience",
+    tip: "Include role, company, dates, and impact bullets.",
+    test: (text) => /\b(experience|work experience|employment|professional experience)\b/i.test(text),
+  },
+  {
+    id: "education",
+    label: "Education",
+    tip: "Add degree, institute, and passing year.",
+    test: (text) => /\b(education|academic)\b/i.test(text),
+  },
+  {
+    id: "skills",
+    label: "Skills",
+    tip: "Add a dedicated skills section with role keywords.",
+    test: (text) => /\b(skills|technical skills|core skills|tech stack)\b/i.test(text),
+  },
+  {
+    id: "projects",
+    label: "Projects",
+    tip: "Show 1-3 relevant projects with measurable outcomes.",
+    test: (text) => /\b(projects|project experience|key projects)\b/i.test(text),
+  },
+  {
+    id: "certifications",
+    label: "Certifications",
+    tip: "Include certifications that support the role.",
+    test: (text) => /\b(certification|certifications|certificate|licenses?)\b/i.test(text),
+  },
+  {
+    id: "achievements",
+    label: "Achievements / Awards",
+    tip: "Add awards or achievements to strengthen credibility.",
+    test: (text) => /\b(achievement|achievements|award|awards|accomplishments?)\b/i.test(text),
+  },
+  {
+    id: "internships",
+    label: "Internships",
+    tip: "List internships when they are relevant to target jobs.",
+    test: (text) => /\b(internship|internships)\b/i.test(text),
+  },
+  {
+    id: "languages",
+    label: "Languages",
+    tip: "Mention spoken or professional languages if useful.",
+    test: (text) => /\b(languages?)\b/i.test(text),
+  },
+];
+
 function normalizeText(text) {
   return (text || "")
     .replace(/\r/g, "")
@@ -162,6 +228,46 @@ function parseSkillTokens(skills) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function compareResumeSections(originalText, generatedText) {
+  const source = String(originalText || "").trim();
+  if (!source) return null;
+
+  const candidate = String(generatedText || "");
+
+  const originalPresence = SECTION_COMPARE_RULES.map((rule) => ({
+    id: rule.id,
+    label: rule.label,
+    tip: rule.tip,
+    present: rule.test(source),
+  }));
+  const generatedPresence = SECTION_COMPARE_RULES.map((rule) => ({
+    id: rule.id,
+    label: rule.label,
+    tip: rule.tip,
+    present: rule.test(candidate),
+  }));
+
+  const generatedMap = new Map(generatedPresence.map((item) => [item.id, item]));
+  const originalSections = originalPresence.filter((item) => item.present);
+  const retainedSections = originalSections.filter((item) => generatedMap.get(item.id)?.present);
+  const missingSections = originalSections.filter((item) => !generatedMap.get(item.id)?.present);
+  const extraSections = generatedPresence.filter(
+    (item) => item.present && !originalSections.some((original) => original.id === item.id)
+  );
+
+  const coverage = originalSections.length
+    ? Math.round((retainedSections.length * 100) / originalSections.length)
+    : 100;
+
+  return {
+    originalSections,
+    retainedSections,
+    missingSections,
+    extraSections,
+    coverage,
+  };
 }
 
 function compactResumeForOnePage(data) {
@@ -772,6 +878,7 @@ function ExportStep({
   selectedTemplate,
   onTemplateChange,
   onePageTrimmed,
+  sectionComparison,
 }) {
   return (
     <div>
@@ -886,6 +993,110 @@ function ExportStep({
           placeholder="resume_ats_optimized"
         />
       </div>
+
+      {sectionComparison ? (
+        <div className="form-group">
+          <label className="form-label">section_comparison_with_original_resume</label>
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              background: "var(--d3)",
+              padding: "10px 12px",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--text-primary)",
+                marginBottom: 8,
+              }}
+            >
+              coverage_from_original: {sectionComparison.coverage}% ({sectionComparison.retainedSections.length}/
+              {sectionComparison.originalSections.length})
+            </div>
+
+            {sectionComparison.missingSections.length ? (
+              <div style={{ marginBottom: 8 }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    color: "var(--warning-text)",
+                    marginBottom: 6,
+                  }}
+                >
+                  missing_in_generated:
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {sectionComparison.missingSections.map((item) => (
+                    <span
+                      key={item.id}
+                      style={{
+                        border: "1px solid rgba(245,158,11,0.35)",
+                        background: "rgba(245,158,11,0.12)",
+                        color: "var(--warning-text)",
+                        borderRadius: 999,
+                        padding: "3px 9px",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
+                      title={item.tip}
+                    >
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10.5,
+                  color: "var(--g)",
+                  marginBottom: 8,
+                }}
+              >
+                missing_in_generated: none
+              </div>
+            )}
+
+            {sectionComparison.extraSections.length ? (
+              <div>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    color: "var(--muted)",
+                    marginBottom: 6,
+                  }}
+                >
+                  added_in_generated:
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {sectionComparison.extraSections.map((item) => (
+                    <span
+                      key={item.id}
+                      style={{
+                        border: "1px solid rgba(0,255,136,0.28)",
+                        background: "rgba(0,255,136,0.1)",
+                        color: "var(--g)",
+                        borderRadius: 999,
+                        padding: "3px 9px",
+                        fontSize: 11,
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {error && (
         <div
@@ -1179,6 +1390,7 @@ export default function ResumeBuilder({
   const [importLoading, setImportLoading] = useState(false);
   const [error, setError] = useState("");
   const [generatedResume, setGeneratedResume] = useState("");
+  const [sourceResumeText, setSourceResumeText] = useState("");
   const [existingFile, setExistingFile] = useState(null);
   const [importMessage, setImportMessage] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -1243,6 +1455,12 @@ export default function ResumeBuilder({
 
     return lines.join("\n").trim();
   };
+
+  const comparisonGeneratedText = generatedResume.trim() || buildResumeText(onePagePreview.data);
+  const sectionComparison = useMemo(
+    () => compareResumeSections(sourceResumeText, comparisonGeneratedText),
+    [sourceResumeText, comparisonGeneratedText]
+  );
 
   const extractTextFromAnalyze = (data) => {
     if (!data || typeof data !== "object") return "";
@@ -1345,6 +1563,7 @@ export default function ResumeBuilder({
       const mergedData = mergeIntoBuilderData(parsed);
       const importedOnePage = compactResumeForOnePage(mergedData);
       setFormData(mergedData);
+      setSourceResumeText(extractedText);
 
       if (!consumeBuilderGuestTryOrRedirect()) {
         return;
@@ -1465,6 +1684,7 @@ export default function ResumeBuilder({
                 onChange={(e) => {
                   setExistingFile(e.target.files?.[0] || null);
                   setImportMessage("");
+                  setSourceResumeText("");
                 }}
                 style={{ maxWidth: 420 }}
               />
@@ -1612,6 +1832,7 @@ export default function ResumeBuilder({
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
                   onePageTrimmed={onePagePreview.trimmed}
+                  sectionComparison={sectionComparison}
                 />
               )}
 
