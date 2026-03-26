@@ -55,6 +55,7 @@ History (JWT required):
 
 1. Clone and install frontend dependencies:
 ```bash
+
 cd frontend/React
 npm install
 ```
@@ -62,7 +63,7 @@ npm install
 2. Create env files:
 - `frontend/.env.example` -> copy to `frontend/React/.env` and set:
 ```bash
-VITE_API_URL=http://localhost:8080
+VITE_API_URL = http://localhost:8080
 ```
 - `backend/.env.example` -> copy to your backend env setup and set:
 ```bash
