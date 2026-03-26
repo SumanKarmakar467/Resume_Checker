@@ -75,12 +75,14 @@ GEMINI_API_KEY=
 
 3. Run backend:
 ```bash
+
 cd "backend/Spring Boot"
 mvn spring-boot:run
 ```
 
 4. Run frontend:
 ```bash
+
 cd frontend/React
 npm run dev
 ```
