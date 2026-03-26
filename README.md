@@ -48,7 +48,7 @@ Resume:
 - `POST /api/resume/suggestions`
 
 History (JWT required):
-- `GET /api/history`
+- `GET /  api/history`
 - `DELETE /api/history/{id}`
 
 ## Run Locally
