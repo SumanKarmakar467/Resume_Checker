@@ -2,7 +2,7 @@
 
 > AI-powered ATS resume analysis platform that scores resumes, highlights keyword gaps, and generates rewrite suggestions.
 
-🔗 **Live Demo:** https://resume-checker-alpha-two.vercel.app
+🔗 **Live Demo: ** https://resume-checker-alpha-two.vercel.app
 
 ![React](https://img.shields.io/badge/Frontend-React-61DAFB?logo=react&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Backend-Spring_Boot-6DB33F?logo=springboot&logoColor=white)
