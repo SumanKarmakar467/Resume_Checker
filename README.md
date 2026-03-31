@@ -1,94 +1,148 @@
-# Resume_Checker
+﻿# ATS Resume Checker (MERN)
 
-> AI-powered ATS resume analysis platform that scores resumes, highlights keyword gaps, and generates rewrite suggestions.
+AI-powered ATS Resume Checker built with **React + Express + MongoDB + Gemini**.
 
-🔗 **Live Demo: ** https://resume-checker-alpha-two.vercel.app
+## Architecture
 
-![React] (https://img.shields.io/badge/Frontend-React-61DAFB?logo=react&logoColor=white)
-![Spring Boot] (https://img.shields.io/badge/Backend-Spring_Boot-6DB33F?logo=springboot&logoColor=white)
-![MongoDB] (https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb&logoColor=white)
-![Gemini API] (https://img.shields.io/badge/AI-Gemini_API-4285F4?logo=google&logoColor=white)
-![Vercel] (https://img.shields.io/badge/Deploy-Vercel-000000?logo=vercel&logoColor=white)
+```text
++--------------------+        HTTP (REST)         +-------------------------+
+| React (Vite)       |  <---------------------->  | Node.js + Express API   |
+| frontend/React     |                            | backend/server.js       |
++--------------------+                            +-----------+-------------+
+                                                              |
+                                               Mongoose       |
+                                                              v
+                                                    +-------------------+
+                                                    | MongoDB Atlas     |
+                                                    | resume analyses   |
+                                                    +-------------------+
+                                                              |
+                                                              | SDK call
+                                                              v
+                                                    +-------------------+
+                                                    | Google Gemini API |
+                                                    +-------------------+
+```
 
-![ATS Score Meter Placeholder] (./docs/screenshots/ats-score-meter.svg)
-![Keyword Match + AI Suggestions Placeholder] (./docs/screenshots/keyword-ai-suggestions.svg)
+## Backend Structure
+
+```text
+backend/
+├── server.js
+├── package.json
+├── .env
+├── config/
+│   └── db.js
+├── models/
+│   └── ResumeAnalysis.js
+├── routes/
+│   └── resume.routes.js
+├── controllers/
+│   └── resume.controller.js
+├── services/
+│   └── resume.service.js
+└── middleware/
+    ├── upload.middleware.js
+    └── error.middleware.js
+```
 
 ## Features
-- 0-100 ATS compatibility score with animated circular meter
-- Keyword match highlighting against job description
-- Section-wise breakdown (Keywords, Skills, Experience, Formatting, Contact)
-- JWT auth (register/login) and history dashboard (last 10 checks)
-- Gemini-powered AI rewrite suggestions with retry fallback
-- Downloadable PDF ATS report (jsPDF + html2canvas)
-- Rate limiting on analyze endpoint (10 requests/hour/IP)
 
-## Tech Stack
-- React
-- Spring Boot (Java 17)
-- MongoDB
-- Google Gemini API
-- Vercel (frontend deployment)
+- Upload resume in **PDF / DOCX / TXT**
+- ATS analysis against optional job description
+- Keyword match and missing-keyword detection
+- ATS score + feedback + suggestions
+- ATS-optimized resume generation
+- Resume analysis history stored in MongoDB
 
-## What I Built / Learned
-I designed Resume_Checker as an end-to-end ATS workflow instead of a single upload demo.  
-The backend combines deterministic scoring logic with Gemini suggestions, so users get both a numeric signal and actionable rewrites.  
-I implemented JWT-based auth and history tracking to make resume iterations measurable over time.  
-I also improved production-readiness with file-size/type validation, API error boundaries, and request rate limiting.
+## API Endpoints
 
-## API Overview
-Base URL: `/api`
+Base URL: `http://localhost:5000/api/resume`
 
-Auth:
-- `POST /api/auth/register`
-- `POST /api/auth/login`
+- `POST /analyze`
+  - `multipart/form-data`
+  - fields:
+    - `file` (required)
+    - `jobDescription` (optional)
+- `POST /generate-ats`
+  - JSON body:
+    ```json
+    {
+      "resumeText": "...",
+      "jobDescription": "..."
+    }
+    ```
+- `GET /history`
 
-Resume:
-- `POST /api/resume/analyze` (multipart: `file`, optional `jobDescription`, optional `jobTitle`)
-- `POST /api/resume/generate-ats`
-- `POST /api/resume/suggestions`
+## Mongoose Schema
 
-History (JWT required):
-- `GET /  api/history`
-- `DELETE /api/history/{id}`
+```js
+const ResumeAnalysisSchema = new mongoose.Schema({
+  filename: String,
+  resumeText: String,
+  jobDescription: String,
+  atsScore: Number,
+  matchedKeywords: [String],
+  missingKeywords: [String],
+  feedback: String,
+  suggestions: [String],
+  optimizedResume: String,
+  createdAt: { type: Date, default: Date.now }
+});
+```
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+```bash
+PORT=5000
+MONGODB_URI=your_mongodb_atlas_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+### Frontend (`frontend/React/.env`)
+
+```bash
+VITE_API_URL=http://localhost:5000
+VITE_ADMIN_EMAIL=
+```
+
+`VITE_ADMIN_EMAIL` is optional and only used to show/hide the admin dashboard link.
 
 ## Run Locally
 
-1. Clone and install frontend dependencies:
-```bash
+### 1. Backend
 
-cd frontend/React
+```bash
+cd backend
 npm install
-```
-
-2. Create env files:
-- `frontend/.env.example` -> copy to `frontend/React/.env` and set:
-```bash
-VITE_API_URL = http://localhost:8080
-```
-- `backend/.env.example` -> copy to your backend env setup and set:
-```bash
-MONGO_URI=
-JWT_SECRET=
-JWT_EXPIRY_DAYS=7
-GEMINI_API_KEY=
-```
-
-3. Run backend:
-```bash
-
-cd "backend/Spring Boot"
-mvn spring-boot:run
-```
-
-4. Run frontend:
-```bash
-
-cd frontend/React
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`.
+Backend runs on `http://localhost:5000`.
 
-## Notes
-- `backend/Node` exists in repo history, but the active API for v2.0 is Spring Boot.
-- Add actual screenshots/GIFs to `docs/screenshots/` before recruiter sharing.
+### 2. Frontend
+
+```bash
+cd frontend/React
+npm install
+npm run dev
+```
+
+Frontend runs on `http://localhost:5173`.
+
+## Frontend Routes
+
+- `/upload` -> upload resume + analyze
+- `/result` -> ATS score, keywords, suggestions, optimized resume download
+- `/history` -> past analysis records from MongoDB
+
+## Tech Stack
+
+- Frontend: React, Vite
+- Backend: Node.js, Express
+- Database: MongoDB Atlas + Mongoose
+- File Parsing: `pdf-parse`, `mammoth`, `multer`
+- AI: `@google/generative-ai` (Gemini)
