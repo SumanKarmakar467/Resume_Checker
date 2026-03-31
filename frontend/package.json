@@ -1,0 +1,11 @@
+{
+  "name": "resume-checker-frontend-shell",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm run dev --prefix React",
+    "build": "npm run build --prefix React",
+    "preview": "npm run preview --prefix React",
+    "install:app": "npm install --prefix React"
+  }
+}
