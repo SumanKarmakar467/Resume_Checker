@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import Navbar from "../components/Navbar";
+import { incrementUserCounter } from "../services/firestoreUsers";
 
-const API_BASE = "http://localhost:8080/api/resume";
+const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/resume`;
 
 export default function UploadResume({
   navigate,
@@ -10,6 +11,7 @@ export default function UploadResume({
   guestAnalyzerUsed,
   consumeGuestAnalyzerTry,
   requireAuth,
+  onLogout,
 }) {
   const [file, setFile] = useState(null);
   const [jobDesc, setJobDesc] = useState("");
@@ -54,7 +56,10 @@ export default function UploadResume({
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.error || `Server error: ${res.status}`);
+      }
       const data = await res.json();
       if (!user) {
         const allowed = consumeGuestAnalyzerTry?.();
@@ -63,6 +68,11 @@ export default function UploadResume({
           requireAuth?.();
           return;
         }
+      }
+      if (user?.uid) {
+        incrementUserCounter(user.uid, "resumesChecked").catch(() => {
+          // Metrics sync should not block analysis flow.
+        });
       }
       setAnalysisResult(data);
       navigate("result");
@@ -75,7 +85,7 @@ export default function UploadResume({
 
   return (
     <div>
-      <Navbar navigate={navigate} user={user} />
+      <Navbar navigate={navigate} user={user} onLogout={onLogout} />
 
       <div
         style={{
@@ -192,7 +202,7 @@ export default function UploadResume({
           />
           {file ? (
             <div>
-              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>📄</div>
+              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>ðŸ“„</div>
               <div
                 style={{
                   fontFamily: "var(--font-mono)",
@@ -210,7 +220,7 @@ export default function UploadResume({
                   color: "var(--muted)",
                 }}
               >
-                {(file.size / 1024).toFixed(1)} KB ·{" "}
+                {(file.size / 1024).toFixed(1)} KB Â·{" "}
                 <span
                   style={{ color: "var(--r)", cursor: "pointer" }}
                   onClick={(e) => {
@@ -224,7 +234,7 @@ export default function UploadResume({
             </div>
           ) : (
             <div>
-              <div className="drop-icon">📤</div>
+              <div className="drop-icon">ðŸ“¤</div>
               <div className="drop-text">
                 <strong>Click to browse</strong> or drag & drop your resume
               </div>
@@ -236,7 +246,7 @@ export default function UploadResume({
                   marginTop: 8,
                 }}
               >
-                PDF · DOCX · TXT supported
+                PDF Â· DOCX Â· TXT supported
               </div>
             </div>
           )}
@@ -253,7 +263,7 @@ export default function UploadResume({
                 fontSize: 10,
               }}
             >
-              (optional — enables keyword matching)
+              (optional â€” enables keyword matching)
             </span>
           </label>
           <textarea
@@ -296,7 +306,7 @@ export default function UploadResume({
               marginBottom: "1.5rem",
             }}
           >
-            ✗ {error}
+            âœ— {error}
           </div>
         )}
 
@@ -323,7 +333,7 @@ export default function UploadResume({
               analyzing...
             </>
           ) : (
-            "→ run_ats_analysis()"
+            "â†’ run_ats_analysis()"
           )}
         </button>
 
@@ -332,3 +342,4 @@ export default function UploadResume({
     </div>
   );
 }
+

@@ -1,9 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
+import TemplateGallery from "../components/TemplateGallery";
+import { incrementUserCounter } from "../services/firestoreUsers";
 
-const API_BASE = "http://localhost:8080/api/resume";
+const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/resume`;
 const ACCEPTED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -41,9 +43,11 @@ const EMPTY = {
 const RESUME_TEMPLATES = [
   {
     id: "ats_clean",
-    name: "ATS Clean",
-    description: "Single-column ATS-safe layout with clear sections.",
-    useCase: "Best for software, analytics, and corporate roles.",
+    name: "Classic Professional",
+    description: "Single column with blue accent section headings.",
+    useCase: "General professional applications.",
+    atsScore: 96,
+    photoIncluded: false,
     primary: "#0f766e",
     background: "#ffffff",
     text: "#111827",
@@ -53,9 +57,11 @@ const RESUME_TEMPLATES = [
   },
   {
     id: "modern_split",
-    name: "Modern Split",
-    description: "Two-column professional template with subtle color accents.",
-    useCase: "Best for product, UI, and full-stack profiles.",
+    name: "Modern Sidebar",
+    description: "Two-column resume with dark sidebar for contact and skills.",
+    useCase: "Product, design, and full-stack roles.",
+    atsScore: 94,
+    photoIncluded: false,
     primary: "#1d4ed8",
     background: "#ffffff",
     text: "#0f172a",
@@ -65,9 +71,11 @@ const RESUME_TEMPLATES = [
   },
   {
     id: "executive",
-    name: "Executive",
-    description: "Balanced premium look with elegant typography and spacing.",
-    useCase: "Best for senior and leadership applications.",
+    name: "With Photo - Executive",
+    description: "Executive-style layout with strong header and photo area.",
+    useCase: "Leadership and senior-level profiles.",
+    atsScore: 92,
+    photoIncluded: true,
     primary: "#7c2d12",
     background: "#fffdf7",
     text: "#1f2937",
@@ -77,9 +85,11 @@ const RESUME_TEMPLATES = [
   },
   {
     id: "minimal_mono",
-    name: "Minimal Mono",
-    description: "Compact ATS layout with strong hierarchy and dense content fit.",
-    useCase: "Best for freshers and internship applications.",
+    name: "Minimal Clean",
+    description: "Thin dividers, maximum whitespace, no color styling.",
+    useCase: "Clean ATS-friendly applications.",
+    atsScore: 97,
+    photoIncluded: false,
     primary: "#1f2937",
     background: "#ffffff",
     text: "#111827",
@@ -89,9 +99,11 @@ const RESUME_TEMPLATES = [
   },
   {
     id: "impact_edge",
-    name: "Impact Edge",
-    description: "Bold accent strips and achievement-focused section styling.",
-    useCase: "Best for marketing, sales, and growth roles.",
+    name: "Creative Accent",
+    description: "Single column with colorful left-border accents.",
+    useCase: "Marketing, content, and creative roles.",
+    atsScore: 91,
+    photoIncluded: false,
     primary: "#be123c",
     background: "#fffdfd",
     text: "#1f2937",
@@ -101,9 +113,11 @@ const RESUME_TEMPLATES = [
   },
   {
     id: "tech_blueprint",
-    name: "Tech Blueprint",
-    description: "Structured, engineering-first layout with precise visual rhythm.",
-    useCase: "Best for backend, DevOps, and data engineering roles.",
+    name: "Tech / Developer",
+    description: "Monospace, terminal-inspired visual language for developers.",
+    useCase: "Software engineering and DevOps roles.",
+    atsScore: 95,
+    photoIncluded: false,
     primary: "#0f766e",
     background: "#f8fafc",
     text: "#0f172a",
@@ -867,6 +881,7 @@ function ProjectsForm({ data, onChange }) {
 
 function ExportStep({
   onGenerate,
+  onTemplateConfirm,
   onDownloadPdf,
   loading,
   error,
@@ -891,56 +906,13 @@ function ExportStep({
 
       <div className="form-group">
         <label className="form-label">choose_template</label>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
-            gap: "0.7rem",
-          }}
-        >
-          {RESUME_TEMPLATES.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => onTemplateChange(template.id)}
-              style={{
-                borderRadius: 10,
-                border: `1px solid ${selectedTemplate === template.id ? template.primary : "var(--border)"}`,
-                background: selectedTemplate === template.id ? `${template.primary}1A` : "var(--d3)",
-                color: "var(--text-primary)",
-                padding: "10px 11px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 999,
-                    background: template.primary,
-                    border: "1px solid rgba(15,23,42,0.2)",
-                  }}
-                />
-                <div style={{ fontWeight: 700, fontSize: 12 }}>{template.name}</div>
-              </div>
-              <div style={{ fontSize: 11, opacity: 0.92, marginTop: 5, color: "var(--muted)", lineHeight: 1.55 }}>
-                {template.description}
-              </div>
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 10.5,
-                  fontFamily: "var(--font-mono)",
-                  color: selectedTemplate === template.id ? template.primary : "var(--muted)",
-                }}
-              >
-                best_for: {template.useCase}
-              </div>
-            </button>
-          ))}
-        </div>
+        <TemplateGallery
+          templates={RESUME_TEMPLATES}
+          selectedTemplate={selectedTemplate}
+          onSelect={onTemplateChange}
+          onConfirm={onTemplateConfirm}
+          loading={loading}
+        />
         <div
           style={{
             marginTop: 8,
@@ -1123,39 +1095,33 @@ function ExportStep({
               background: "rgba(0,255,136,0.06)",
               border: "1px solid rgba(0,255,136,0.2)",
               borderRadius: 10,
-              padding: "1.25rem",
+              padding: "0.8rem",
               marginBottom: "1rem",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--g)",
-              textAlign: "left",
-              lineHeight: 1.8,
-              whiteSpace: "pre-wrap",
-              maxHeight: 280,
-              overflow: "auto",
+              overflow: "hidden",
             }}
           >
-            {generatedResume}
+            <iframe
+              title="generated-template-preview"
+              srcDoc={generatedResume}
+              style={{
+                border: "none",
+                width: "100%",
+                height: 300,
+                borderRadius: 8,
+                background: "#fff",
+              }}
+            />
           </div>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf} disabled={loading}>
               {loading ? "processing..." : "download_pdf()"}
             </button>
             <button className="btn-secondary" style={{ fontSize: 14 }} onClick={onGenerate} disabled={loading}>
-              regenerate()
+              regenerate_with_selected_template()
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          className="btn-primary"
-          style={{ width: "100%", justifyContent: "center", fontSize: 14 }}
-          onClick={onGenerate}
-          disabled={loading}
-        >
-          {loading ? "generating with AI..." : "generate_ats_resume()"}
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1383,6 +1349,7 @@ export default function ResumeBuilder({
   guestBuilderUsed,
   consumeGuestBuilderTry,
   requireAuth,
+  onLogout,
 }) {
   const [step, setStep] = useState(0);
   const [formData, setFormData] = useState(EMPTY);
@@ -1456,7 +1423,8 @@ export default function ResumeBuilder({
     return lines.join("\n").trim();
   };
 
-  const comparisonGeneratedText = generatedResume.trim() || buildResumeText(onePagePreview.data);
+  const comparisonGeneratedText =
+    generatedResume.trim().replace(/<[^>]+>/g, " ") || buildResumeText(onePagePreview.data);
   const sectionComparison = useMemo(
     () => compareResumeSections(sourceResumeText, comparisonGeneratedText),
     [sourceResumeText, comparisonGeneratedText]
@@ -1479,17 +1447,25 @@ export default function ResumeBuilder({
     return "";
   };
 
-  const generateAtsResume = async (resumeText) => {
+  const generateAtsResume = async (resumeText, templateId = selectedTemplate) => {
+    const templateMeta =
+      RESUME_TEMPLATES.find((template) => template.id === templateId) || RESUME_TEMPLATES[0];
     const res = await fetch(`${API_BASE}/generate-ats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         resumeText,
         jobDescription: jobDescription.trim(),
+        templateName: templateMeta.name,
       }),
     });
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
     const data = await res.json();
+    if (user?.uid) {
+      incrementUserCounter(user.uid, "resumesGenerated").catch(() => {
+        // Metrics sync should not block generate flow.
+      });
+    }
     return data.generatedResume || data.resume || resumeText;
   };
 
@@ -1511,6 +1487,11 @@ export default function ResumeBuilder({
       });
       if (analyzeRes.ok) {
         const analyzeData = await analyzeRes.json();
+        if (user?.uid) {
+          incrementUserCounter(user.uid, "resumesChecked").catch(() => {
+            // Metrics sync should not block resume extraction.
+          });
+        }
         const extracted = extractTextFromAnalyze(analyzeData);
         if (extracted) return extracted;
       }
@@ -1570,7 +1551,7 @@ export default function ResumeBuilder({
       }
 
       try {
-        const optimizedText = await generateAtsResume(buildResumeText(importedOnePage.data));
+        const optimizedText = await generateAtsResume(buildResumeText(importedOnePage.data), selectedTemplate);
         setGeneratedResume(optimizedText);
       } catch (genErr) {
         setGeneratedResume(buildResumeText(importedOnePage.data));
@@ -1586,7 +1567,7 @@ export default function ResumeBuilder({
     }
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (templateId = selectedTemplate) => {
     if (!consumeBuilderGuestTryOrRedirect()) {
       return;
     }
@@ -1594,7 +1575,7 @@ export default function ResumeBuilder({
     setError("");
     try {
       const resumeText = buildResumeText(onePagePreview.data);
-      const optimized = await generateAtsResume(resumeText);
+      const optimized = await generateAtsResume(resumeText, templateId);
       setGeneratedResume(optimized);
     } catch (err) {
       setError(`${err.message} - falling back to local export.`);
@@ -1602,6 +1583,13 @@ export default function ResumeBuilder({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTemplateConfirm = (templateId) => {
+    if (templateId && templateId !== selectedTemplate) {
+      setSelectedTemplate(templateId);
+    }
+    handleGenerate(templateId || selectedTemplate);
   };
 
   const handleDownloadPdf = async () => {
@@ -1629,7 +1617,7 @@ export default function ResumeBuilder({
 
   return (
     <div>
-      <Navbar navigate={navigate} user={user} />
+      <Navbar navigate={navigate} user={user} onLogout={onLogout} />
 
       <div
         style={{ maxWidth: 1120, margin: "0 auto", padding: "3.5rem 2rem" }}
@@ -1821,6 +1809,7 @@ export default function ResumeBuilder({
               {step === 5 && (
                 <ExportStep
                   onGenerate={handleGenerate}
+                  onTemplateConfirm={handleTemplateConfirm}
                   onDownloadPdf={handleDownloadPdf}
                   loading={loading || isExportingPdf}
                   error={error}
@@ -1930,3 +1919,4 @@ export default function ResumeBuilder({
     </div>
   );
 }
+
