@@ -18,9 +18,10 @@ function Bar({ pct, color }) {
   );
 }
 
-export default function Result({ navigate, result }) {
+export default function Result({ navigate, result, user, onLogout }) {
   const [count, setCount] = useState(0);
   const score = result?.atsScore ?? result?.score ?? 0;
+  const optimizedResume = result?.optimizedResume || "";
 
   useEffect(() => {
     let n = 0;
@@ -35,7 +36,7 @@ export default function Result({ navigate, result }) {
   if (!result) {
     return (
       <div>
-        <Navbar navigate={navigate} />
+        <Navbar navigate={navigate} user={user} onLogout={onLogout} />
         <div style={{ textAlign: "center", padding: "6rem 2rem" }}>
           <div style={{ fontFamily: "var(--font-mono)", color: "var(--muted)", marginBottom: "1.5rem" }}>
             # no result found — upload a resume first
@@ -50,8 +51,22 @@ export default function Result({ navigate, result }) {
 
   const keywords = result.matchedKeywords || result.keywords || [];
   const missingKeywords = result.missingKeywords || [];
-  const suggestions = result.suggestions || result.feedback || [];
-  const sections = result.sections || {};
+  const suggestions = Array.isArray(result.suggestions)
+    ? result.suggestions
+    : result.feedback
+      ? [result.feedback]
+      : [];
+
+  const downloadOptimizedResume = () => {
+    if (!optimizedResume.trim()) return;
+    const blob = new Blob([optimizedResume], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ats_optimized_resume.txt";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   const scoreColor =
     score >= 80 ? "var(--g)" : score >= 60 ? "var(--o)" : "var(--r)";
@@ -60,7 +75,7 @@ export default function Result({ navigate, result }) {
 
   return (
     <div>
-      <Navbar navigate={navigate} />
+      <Navbar navigate={navigate} user={user} onLogout={onLogout} />
       <div
         style={{
           maxWidth: 960,
@@ -300,7 +315,7 @@ export default function Result({ navigate, result }) {
                         {String(i + 1).padStart(2, "0")}
                       </div>
                       <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.65 }}>
-                        {s}
+                        {typeof s === "string" ? s : JSON.stringify(s)}
                       </div>
                     </div>
                   ))}
@@ -308,6 +323,22 @@ export default function Result({ navigate, result }) {
               </div>
             </div>
           )}
+
+          {optimizedResume ? (
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
+              <div className="card-head" style={{ color: "var(--g)" }}>
+                optimized_resume_preview
+              </div>
+              <div style={{ padding: "1.5rem" }}>
+                <textarea
+                  className="form-textarea"
+                  rows={10}
+                  value={optimizedResume}
+                  readOnly
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Action Buttons */}
@@ -325,6 +356,14 @@ export default function Result({ navigate, result }) {
           </button>
           <button className="btn-secondary" onClick={() => navigate("upload")}>
             analyze_another()
+          </button>
+          {optimizedResume ? (
+            <button className="btn-secondary" onClick={downloadOptimizedResume}>
+              download_optimized_resume()
+            </button>
+          ) : null}
+          <button className="btn-ghost" onClick={() => navigate("history")}>
+            view_history()
           </button>
         </div>
       </div>

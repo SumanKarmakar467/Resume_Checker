@@ -1,4 +1,9 @@
-export default function Navbar({ navigate, user }) {
+﻿export default function Navbar({ navigate, user, onLogout }) {
+  const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase();
+  const isAdmin = Boolean(
+    user?.isAdmin || (adminEmail && String(user?.email || "").toLowerCase() === adminEmail)
+  );
+
   return (
     <nav className="navbar">
       <div className="nav-logo mono">
@@ -16,19 +21,27 @@ export default function Navbar({ navigate, user }) {
         <button onClick={() => navigate("landing")}>features</button>
         <button onClick={() => navigate("builder")}>resume_builder</button>
         <button onClick={() => navigate("upload")}>ats_checker</button>
-        {user && <button>dashboard</button>}
+        <button onClick={() => navigate("history")}>history</button>
+        {isAdmin ? <button onClick={() => navigate("admin")}>admin</button> : null}
       </div>
 
       <div className="nav-right">
         {user ? (
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "12px",
-              color: "var(--g)",
-            }}
-          >
-            ● {user.email}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "12px",
+                color: "var(--g)",
+              }}
+            >
+              {user.email}
+            </div>
+            {onLogout ? (
+              <button className="btn-ghost" onClick={onLogout}>
+                logout()
+              </button>
+            ) : null}
           </div>
         ) : (
           <>
