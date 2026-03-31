@@ -1,20 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --g: #00ff88;
-  --c: #00e5ff;
-  --p: #bd93f9;
-  --o: #ffb86c;
-  --r: #ff5555;
+  --g: #00f5a0;
+  --c: #19d8ff;
+  --p: #b388ff;
+  --o: #ffbb67;
+  --r: #ff5c74;
   --dark: #0d1117;
-  --d2: #161b22;
-  --d3: #21262d;
-  --d4: #2d333b;
-  --border: #30363d;
-  --text: #e6edf3;
-  --muted: #8b949e;
+  --page-bg: #f6f8fd;
+  --nav-bg: rgba(246, 248, 253, 0.92);
+  --d2: #ffffff;
+  --d3: #f2f6ff;
+  --d4: #e8eef8;
+  --border: #d8e2f0;
+  --text: #0f172a;
+  --muted: #5f7089;
   --font-main: 'Outfit', sans-serif;
   --font-mono: 'Fira Code', monospace;
+}
+
+.dark {
+  --g: #00f5a0;
+  --c: #19d8ff;
+  --p: #b388ff;
+  --o: #ffbb67;
+  --r: #ff5c74;
+  --dark: #000000;
+  --page-bg: #000000;
+  --nav-bg: rgba(6, 11, 20, 0.92);
+  --d2: #070707;
+  --d3: #0d0d0d;
+  --d4: #141414;
+  --border: #242424;
+  --text: #e5edf7;
+  --muted: #9aa0aa;
 }
 
 *, *::before, *::after {
@@ -28,11 +47,19 @@ html {
 }
 
 body {
-  background: var(--dark);
+  background: var(--page-bg);
   color: var(--text);
   font-family: var(--font-main);
   overflow-x: hidden;
   line-height: 1.6;
+}
+
+html.dark body {
+  background: #000000;
+}
+
+html:not(.dark) body {
+  background: #f6f8fd;
 }
 
 .app {
@@ -52,7 +79,7 @@ h1, h2, h3, h4, h5 {
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--dark); }
+::-webkit-scrollbar-track { background: var(--page-bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
@@ -74,7 +101,7 @@ h1, h2, h3, h4, h5 {
 }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 255, 136, 0.25);
+  box-shadow: 0 10px 30px rgba(0, 245, 160, 0.26);
 }
 
 .btn-secondary {
@@ -84,12 +111,12 @@ h1, h2, h3, h4, h5 {
   color: var(--c);
   padding: 12px 24px;
   border-radius: 8px;
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  border: 1px solid rgba(25, 216, 255, 0.35);
   cursor: pointer;
   transition: all 0.25s;
 }
 .btn-secondary:hover {
-  background: rgba(0, 229, 255, 0.07);
+  background: rgba(25, 216, 255, 0.07);
 }
 
 .btn-ghost {
@@ -113,7 +140,7 @@ h1, h2, h3, h4, h5 {
   position: sticky;
   top: 0;
   z-index: 200;
-  background: rgba(13, 17, 23, 0.92);
+  background: var(--nav-bg);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   padding: 0 2rem;
@@ -350,8 +377,8 @@ h1, h2, h3, h4, h5 {
   background-image:
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.2;
+  background-size: 52px 52px;
+  opacity: 0.18;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, black, transparent);
   pointer-events: none;
 }

@@ -1,11 +1,10 @@
-﻿import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
 import TemplateGallery from "../components/TemplateGallery";
 import { incrementUserCounter } from "../services/firestoreUsers";
-
-const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/resume`;
+import { requestResumeApi } from "../api/resumeApi";
 const ACCEPTED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -29,6 +28,7 @@ const EMPTY = {
     phone: "",
     location: "",
     linkedin: "",
+    portfolio: "",
     github: "",
     headline: "",
     summary: "",
@@ -244,6 +244,16 @@ function parseSkillTokens(skills) {
     .filter(Boolean);
 }
 
+function hasInternshipEntries(experience = []) {
+  return experience.some((item) =>
+    /intern(ship)?/i.test(
+      [item.role, item.company, ...(item.bullets || [])]
+        .filter(Boolean)
+        .join(" ")
+    )
+  );
+}
+
 function compareResumeSections(originalText, generatedText) {
   const source = String(originalText || "").trim();
   if (!source) return null;
@@ -366,81 +376,118 @@ function compactResumeForOnePage(data) {
 function parseUploadedResumeText(rawText) {
   const text = normalizeText(rawText);
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
-  const firstLine = lines[0] || "";
+
+  const headingMatchers = {
+    summary: /^(summary|professional summary|objective|profile|about)\b/i,
+    experience: /^(experience|work experience|professional experience|internship|internships)\b/i,
+    education: /^(education|academic)\b/i,
+    skills: /^(skills|technical skills|core skills|tech stack)\b/i,
+    projects: /^(projects|project experience|key projects)\b/i,
+  };
+
+  const sections = {
+    header: [],
+    summary: [],
+    experience: [],
+    education: [],
+    skills: [],
+    projects: [],
+  };
+
+  let currentSection = "header";
+  lines.forEach((line) => {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    const matchKey = Object.entries(headingMatchers).find(([, regex]) => regex.test(normalized))?.[0];
+    if (matchKey) {
+      currentSection = matchKey;
+      const inline = normalized.split(":").slice(1).join(":").trim();
+      if (inline.length > 2) {
+        sections[currentSection].push(inline);
+      }
+      return;
+    }
+    sections[currentSection].push(normalized);
+  });
 
   const email = pickMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const phone = pickMatch(
     text,
     /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/
   );
-  const linkedin = pickMatch(text, /https?:\/\/(?:www\.)?linkedin\.com\/[^\s]+/i);
-  const github = pickMatch(text, /https?:\/\/(?:www\.)?github\.com\/[^\s]+/i);
+  const linkedin = pickMatch(text, /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s]+/i);
+  const github = pickMatch(text, /(?:https?:\/\/)?(?:www\.)?github\.com\/[^\s]+/i);
 
-  const sections = text.split(/\n(?=(experience|education|skills|projects)\s*$)/gim);
-  const fullLower = text.toLowerCase();
-  const experienceStart = fullLower.indexOf("experience");
-  const educationStart = fullLower.indexOf("education");
-  const skillsStart = fullLower.indexOf("skills");
-  const projectsStart = fullLower.indexOf("projects");
+  const allUrls = Array.from(
+    new Set(
+      (text.match(/(?:https?:\/\/|www\.)[^\s)]+/gi) || []).map((url) =>
+        url.replace(/[),.;]+$/g, "")
+      )
+    )
+  );
+  const portfolio =
+    allUrls.find(
+      (url) =>
+        !/linkedin\.com/i.test(url) &&
+        !/github\.com/i.test(url)
+    ) || "";
 
-  const expText =
-    experienceStart >= 0
-      ? text.slice(
-          experienceStart,
-          [educationStart, skillsStart, projectsStart]
-            .filter((n) => n > experienceStart)
-            .sort((a, b) => a - b)[0] || text.length
-        )
-      : "";
-  const eduText =
-    educationStart >= 0
-      ? text.slice(
-          educationStart,
-          [skillsStart, projectsStart]
-            .filter((n) => n > educationStart)
-            .sort((a, b) => a - b)[0] || text.length
-        )
-      : "";
-  const skillsText =
-    skillsStart >= 0
-      ? text.slice(
-          skillsStart,
-          [projectsStart].filter((n) => n > skillsStart)[0] || text.length
-        )
-      : "";
-  const projectsText = projectsStart >= 0 ? text.slice(projectsStart) : "";
+  const maybeName =
+    lines.find(
+      (line) =>
+        /^[A-Za-z][A-Za-z .'-]{2,45}$/.test(line) &&
+        !/@/.test(line) &&
+        !/(summary|objective|education|skills|projects|experience|internship)/i.test(line)
+    ) || "";
 
-  const expLines = expText.split("\n").map((line) => line.trim()).filter(Boolean);
-  const expHeader = expLines.find((line) => /@|\|/.test(line)) || expLines[1] || "";
-  const expHeaderParts = expHeader.split("|").map((p) => p.trim()).filter(Boolean);
+  const maybeHeadline =
+    sections.header.find(
+      (line) =>
+        line.length >= 8 &&
+        line.length <= 80 &&
+        !/@/.test(line) &&
+        !/(linkedin|github|www\.|http)/i.test(line)
+    ) || "";
+
+  const maybeSummary = (sections.summary.length
+    ? sections.summary.join(" ")
+    : sections.header.find((line) => line.length > 70 && line.length < 320) || "").trim();
+
+  const expLines = sections.experience.filter((line) => !headingMatchers.experience.test(line));
+  const expHeader = expLines.find((line) => /@|\||\s-\s/.test(line)) || expLines[0] || "";
   let role = "";
   let company = "";
-  let duration = "";
+  let duration = pickMatch(
+    [expHeader, ...expLines].join(" "),
+    /((19|20)\d{2}\s*(?:-|to)\s*(?:present|(19|20)\d{2}))|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}\s*(?:-|to)\s*(?:present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}))/i
+  );
   if (expHeader.includes("@")) {
-    const [left, right] = expHeader.split("@").map((p) => p.trim());
-    role = left || "";
-    company = (right || "").split("|")[0]?.trim() || "";
-  } else if (expHeaderParts.length >= 2) {
-    role = expHeaderParts[0] || "";
-    company = expHeaderParts[1] || "";
-    duration = expHeaderParts[2] || "";
+    const [left, right] = expHeader.split("@").map((part) => part.trim());
+    role = left;
+    company = right?.split("|")?.[0]?.trim() || "";
   } else {
-    role = expHeader || "";
+    const parts = expHeader.split("|").map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      role = parts[0];
+      company = parts[1];
+      duration = duration || parts[2] || "";
+    } else {
+      role = expHeader;
+    }
   }
-  if (!duration) {
-    duration = pickMatch(expHeader, /(19|20)\d{2}[^,\n]*/i);
+  if (!role && /intern(ship)?/i.test(expLines.join(" "))) {
+    role = "Intern";
   }
   const bullets = expLines
-    .filter((line) => /^[-*]/.test(line) || /^(built|led|developed|implemented|improved|created)/i.test(line))
-    .map((line) => line.replace(/^[-*]\s*/, "").trim())
+    .filter((line) => /^[-*•]/.test(line) || /^(built|led|developed|implemented|improved|created|designed|optimized|managed)/i.test(line))
+    .map((line) => line.replace(/^[-*•]\s*/, "").trim())
     .filter(Boolean)
     .slice(0, 6);
 
-  const eduLines = eduText.split("\n").map((line) => line.trim()).filter(Boolean);
-  const eduLine = eduLines[1] || eduLines[0] || "";
+  const eduLines = sections.education.filter((line) => !headingMatchers.education.test(line));
+  const eduLine = eduLines[0] || "";
   const degree = pickMatch(
     eduLine,
-    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma)[^,|]*/i
+    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma|h\.?s|high school)[^,|]*/i
   );
   const year = pickMatch(eduLine, /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i);
   const institute = eduLine
@@ -450,26 +497,21 @@ function parseUploadedResumeText(rawText) {
     .replace(/[ ]{2,}/g, " ")
     .trim();
 
-  const skillTokens = skillsText
-    .split(/,|\n|\|/)
+  const skillsSource = sections.skills.length ? sections.skills.join(",") : text;
+  const skillTokens = skillsSource
+    .split(/,|\n|\||\/|•/)
     .map((item) => item.trim())
-    .filter(Boolean)
+    .filter((item) => item && item.length <= 32 && /[A-Za-z]/.test(item))
+    .filter((item, index, arr) => arr.findIndex((entry) => entry.toLowerCase() === item.toLowerCase()) === index)
     .slice(0, 24);
 
-  const projectLines = projectsText.split("\n").map((line) => line.trim()).filter(Boolean);
-  const projectName = projectLines[1] || projectLines[0] || "";
-  const projectLink = pickMatch(projectsText, /https?:\/\/[^\s]+/i);
-  const projectDesc = projectLines.slice(2, 5).join(" ");
-
-  const maybeName =
-    firstLine.length <= 60 &&
-    !firstLine.includes("@") &&
-    /^[A-Za-z .'-]{3,}$/.test(firstLine)
-      ? firstLine
-      : "";
-  const maybeHeadline =
-    lines.find((line, idx) => idx > 0 && line.length > 8 && line.length < 80 && !/@/.test(line)) || "";
-  const maybeSummary = lines.slice(0, 8).find((line) => line.length > 60) || "";
+  const projectsLines = sections.projects.filter((line) => !headingMatchers.projects.test(line));
+  const projectName = projectsLines.find((line) => !/(https?:\/\/|www\.)/i.test(line)) || "";
+  const projectLink =
+    projectsLines.find((line) => /(https?:\/\/|www\.)/i.test(line)) ||
+    allUrls.find((url) => !/linkedin\.com|github\.com/i.test(url)) ||
+    "";
+  const projectDesc = projectsLines.slice(1, 4).join(" ");
 
   return {
     personal: {
@@ -478,6 +520,7 @@ function parseUploadedResumeText(rawText) {
       phone,
       location: "",
       linkedin,
+      portfolio,
       github,
       headline: maybeHeadline,
       summary: maybeSummary,
@@ -505,13 +548,13 @@ function parseUploadedResumeText(rawText) {
     },
     projects: [
       {
-        name: projectName.replace(projectLink, "").trim(),
+        name: projectName,
         link: projectLink,
         desc: projectDesc,
       },
     ],
     rawText: text,
-    sectionCount: sections.length,
+    sectionCount: Object.values(sections).filter((value) => value.length).length,
   };
 }
 
@@ -567,6 +610,7 @@ function PersonalForm({ data, onChange }) {
     ["phone", "phone_number", "text", "+91 98xxx xxxxx"],
     ["location", "city, country", "text", "Kolkata, India"],
     ["linkedin", "linkedin_url", "text", "linkedin.com/in/yourprofile"],
+    ["portfolio", "portfolio_url", "text", "yourportfolio.com"],
     ["github", "github_url", "text", "github.com/SumanKarmakar467"],
     ["headline", "professional_headline", "text", "Full Stack Developer | Java + React"],
   ];
@@ -601,11 +645,11 @@ function PersonalForm({ data, onChange }) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">professional_summary</label>
+        <label className="form-label">about_section</label>
         <textarea
           className="form-textarea"
           rows={4}
-          placeholder="Write a concise summary with achievements and target role."
+          placeholder="Write a concise about section with achievements and target role."
           value={data.summary || ""}
           onChange={(e) => onChange({ ...data, summary: e.target.value })}
         />
@@ -702,7 +746,7 @@ function ExperienceForm({ data, onChange }) {
               )
             )}
           </div>
-          <label className="form-label">impact_bullets</label>
+          <label className="form-label">impact_bullets (experience / internship)</label>
           {exp.bullets.map((b, j) => (
             <input
               key={j}
@@ -781,7 +825,7 @@ function SkillsForm({ data, onChange }) {
   return (
     <div>
       {[
-        ["technical", "technical_skills", "Java, Spring Boot, React, REST API, MySQL"],
+        ["technical", "technical_skills", "JavaScript, Node.js + Express, React, REST API, MongoDB"],
         ["tools", "tools_&_platforms", "Git, Maven, Docker, Vercel, Postman"],
         ["languages", "programming_languages", "Java, JavaScript, Python"],
       ].map(([key, label, placeholder]) => (
@@ -1129,6 +1173,10 @@ function LivePreview({ formData, selectedTemplate }) {
   const { personal, experience, education, skills, projects } = formData;
   const template = RESUME_TEMPLATES.find((item) => item.id === selectedTemplate) || RESUME_TEMPLATES[0];
   const allSkills = parseSkillTokens(skills);
+  const hasExperienceContent = experience.some((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean));
+  const hasInternship = hasInternshipEntries(experience);
+  const experienceTitle = hasInternship ? "Internship" : "Experience";
+  const hasProjectsContent = !hasInternship && projects.some((item) => item.name || item.link || item.desc);
 
   const pageShell = {
     background: template.background,
@@ -1177,6 +1225,7 @@ function LivePreview({ formData, selectedTemplate }) {
             <div style={{ fontSize: 9.2 }}>{personal.phone}</div>
             <div style={{ fontSize: 9.2 }}>{personal.location}</div>
             <div style={{ fontSize: 9.2 }}>{personal.linkedin}</div>
+            <div style={{ fontSize: 9.2 }}>{personal.portfolio}</div>
             <div style={{ fontSize: 9.2 }}>{personal.github}</div>
 
             {sectionTitle("Skills")}
@@ -1207,23 +1256,28 @@ function LivePreview({ formData, selectedTemplate }) {
               <div style={{ fontSize: 10.8, marginTop: 3, color: template.text, fontWeight: 700 }}>{personal.headline}</div>
             ) : null}
             {personal.summary ? (
-              <div style={{ marginTop: 8, fontSize: 9.6, color: "#334155" }}>{personal.summary}</div>
+              <>
+                {sectionTitle("About")}
+                <div style={{ marginTop: 4, fontSize: 9.6, color: "#334155" }}>{personal.summary}</div>
+              </>
             ) : null}
 
-            {sectionTitle("Experience")}
-            {experience.map((item, i) => (
-              <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
-                <div style={{ fontWeight: 700, fontSize: 10.2 }}>{item.role || "Role"}</div>
-                <div style={{ fontSize: 9.3, color: "#475569" }}>
-                  {[item.company, item.duration].filter(Boolean).join(" | ")}
-                </div>
-                {item.bullets.filter(Boolean).map((bullet, idx) => (
-                  <div key={`b-${idx}`} style={{ fontSize: 9.2, color: "#334155", marginTop: 2.5 }}>
-                    - {bullet}
+            {hasExperienceContent ? sectionTitle(experienceTitle) : null}
+            {hasExperienceContent
+              ? experience.map((item, i) => (
+                  <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
+                    <div style={{ fontWeight: 700, fontSize: 10.2 }}>{item.role || "Role"}</div>
+                    <div style={{ fontSize: 9.3, color: "#475569" }}>
+                      {[item.company, item.duration].filter(Boolean).join(" | ")}
+                    </div>
+                    {item.bullets.filter(Boolean).map((bullet, idx) => (
+                      <div key={`b-${idx}`} style={{ fontSize: 9.2, color: "#334155", marginTop: 2.5 }}>
+                        - {bullet}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ))}
+                ))
+              : null}
 
             {sectionTitle("Education")}
             {education.map((item, i) => (
@@ -1232,15 +1286,17 @@ function LivePreview({ formData, selectedTemplate }) {
               </div>
             ))}
 
-            {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
-            {projects.map((item, i) => (
-              <div key={`project-${i}`} style={{ marginBottom: 5 }}>
-                <div style={{ fontWeight: 700, fontSize: 9.4 }}>
-                  {[item.name, item.link].filter(Boolean).join(" | ")}
-                </div>
-                <div style={{ fontSize: 9.1, color: "#374151" }}>{item.desc}</div>
-              </div>
-            ))}
+            {hasProjectsContent ? sectionTitle("Projects") : null}
+            {hasProjectsContent
+              ? projects.map((item, i) => (
+                  <div key={`project-${i}`} style={{ marginBottom: 5 }}>
+                    <div style={{ fontWeight: 700, fontSize: 9.4 }}>
+                      {[item.name, item.link].filter(Boolean).join(" | ")}
+                    </div>
+                    <div style={{ fontSize: 9.1, color: "#374151" }}>{item.desc}</div>
+                  </div>
+                ))
+              : null}
           </div>
         </div>
       </div>
@@ -1276,7 +1332,7 @@ function LivePreview({ formData, selectedTemplate }) {
           </div>
           {personal.headline ? <div style={{ fontSize: 10.6, fontWeight: 700 }}>{personal.headline}</div> : null}
           <div style={{ fontSize: 9.1, marginTop: 3, color: "#4b5563" }}>
-            {[personal.email, personal.phone, personal.location, personal.linkedin, personal.github]
+            {[personal.email, personal.phone, personal.location, personal.linkedin, personal.portfolio, personal.github]
               .filter(Boolean)
               .join(" | ")}
           </div>
@@ -1284,25 +1340,30 @@ function LivePreview({ formData, selectedTemplate }) {
       </div>
 
       {personal.summary ? (
-        <div style={{ marginTop: 8, background: template.sectionBg, borderRadius: 7, padding: "8px 10px", color: "#374151", fontSize: 9.5 }}>
-          {personal.summary}
-        </div>
+        <>
+          {sectionTitle("About")}
+          <div style={{ marginTop: 8, background: template.sectionBg, borderRadius: 7, padding: "8px 10px", color: "#374151", fontSize: 9.5 }}>
+            {personal.summary}
+          </div>
+        </>
       ) : null}
 
-      {sectionTitle("Experience")}
-      {experience.map((item, i) => (
-        <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
-          <div style={{ fontWeight: 700, fontSize: 10.1 }}>{item.role || "Role"}</div>
-          <div style={{ fontSize: 9.1, color: "#4b5563" }}>
-            {[item.company, item.duration].filter(Boolean).join(" | ")}
-          </div>
-          {item.bullets.filter(Boolean).map((bullet, idx) => (
-            <div key={`bullet-${idx}`} style={{ fontSize: 9.2, color: "#374151", marginTop: 2.5 }}>
-              - {bullet}
+      {hasExperienceContent ? sectionTitle(experienceTitle) : null}
+      {hasExperienceContent
+        ? experience.map((item, i) => (
+            <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
+              <div style={{ fontWeight: 700, fontSize: 10.1 }}>{item.role || "Role"}</div>
+              <div style={{ fontSize: 9.1, color: "#4b5563" }}>
+                {[item.company, item.duration].filter(Boolean).join(" | ")}
+              </div>
+              {item.bullets.filter(Boolean).map((bullet, idx) => (
+                <div key={`bullet-${idx}`} style={{ fontSize: 9.2, color: "#374151", marginTop: 2.5 }}>
+                  - {bullet}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ))}
+          ))
+        : null}
 
       {sectionTitle("Education")}
       {education.map((item, i) => (
@@ -1332,13 +1393,15 @@ function LivePreview({ formData, selectedTemplate }) {
         </div>
       ) : null}
 
-      {projects.some((item) => item.name || item.desc) ? sectionTitle("Projects") : null}
-      {projects.map((item, i) => (
-        <div key={`project-${i}`} style={{ marginBottom: 5.5 }}>
-          <div style={{ fontWeight: 700, fontSize: 9.3 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
-          <div style={{ fontSize: 8.95, color: "#374151" }}>{item.desc}</div>
-        </div>
-      ))}
+      {hasProjectsContent ? sectionTitle("Projects") : null}
+      {hasProjectsContent
+        ? projects.map((item, i) => (
+            <div key={`project-${i}`} style={{ marginBottom: 5.5 }}>
+              <div style={{ fontWeight: 700, fontSize: 9.3 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
+              <div style={{ fontSize: 8.95, color: "#374151" }}>{item.desc}</div>
+            </div>
+          ))
+        : null}
     </div>
   );
 }
@@ -1371,20 +1434,22 @@ export default function ResumeBuilder({
   const buildResumeText = (d) => {
     const lines = [];
     const p = d.personal;
+    const hasInternship = hasInternshipEntries(d.experience);
+    const showProjects = !hasInternship && d.projects.some((item) => item.name || item.link || item.desc);
     lines.push(p.name || "Your Name");
     if (p.headline) lines.push(p.headline);
-    lines.push([p.email, p.phone, p.location, p.linkedin, p.github].filter(Boolean).join(" | "));
+    lines.push([p.email, p.phone, p.location, p.linkedin, p.portfolio, p.github].filter(Boolean).join(" | "));
     lines.push("");
     if (p.summary) {
-      lines.push("SUMMARY");
-      lines.push("-------");
+      lines.push("ABOUT");
+      lines.push("-----");
       lines.push(p.summary);
       lines.push("");
     }
 
     if (d.experience.some((e) => e.role || e.company || e.bullets?.some(Boolean))) {
-      lines.push("EXPERIENCE");
-      lines.push("----------");
+      lines.push(hasInternship ? "INTERNSHIP" : "EXPERIENCE");
+      lines.push(hasInternship ? "----------" : "----------");
       d.experience.forEach((e) => {
         const header = [e.role, e.company].filter(Boolean).join(" @ ");
         lines.push([header, e.duration].filter(Boolean).join(" | "));
@@ -1410,7 +1475,7 @@ export default function ResumeBuilder({
       lines.push("");
     }
 
-    if (d.projects.some((p) => p.name || p.link || p.desc)) {
+    if (showProjects) {
       lines.push("PROJECTS");
       lines.push("--------");
       d.projects.forEach((p) => {
@@ -1450,7 +1515,7 @@ export default function ResumeBuilder({
   const generateAtsResume = async (resumeText, templateId = selectedTemplate) => {
     const templateMeta =
       RESUME_TEMPLATES.find((template) => template.id === templateId) || RESUME_TEMPLATES[0];
-    const res = await fetch(`${API_BASE}/generate-ats`, {
+    const data = await requestResumeApi("/generate-ats", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1459,14 +1524,12 @@ export default function ResumeBuilder({
         templateName: templateMeta.name,
       }),
     });
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-    const data = await res.json();
     if (user?.uid) {
       incrementUserCounter(user.uid, "resumesGenerated").catch(() => {
         // Metrics sync should not block generate flow.
       });
     }
-    return data.generatedResume || data.resume || resumeText;
+    return data.optimizedResume || data.generatedResume || data.resume || resumeText;
   };
 
   const readExistingResumeText = async (file) => {
@@ -1481,12 +1544,11 @@ export default function ResumeBuilder({
     }
 
     try {
-      const analyzeRes = await fetch(`${API_BASE}/analyze`, {
+      const analyzeData = await requestResumeApi("/analyze", {
         method: "POST",
         body: formDataPayload,
       });
-      if (analyzeRes.ok) {
-        const analyzeData = await analyzeRes.json();
+      if (analyzeData && typeof analyzeData === "object") {
         if (user?.uid) {
           incrementUserCounter(user.uid, "resumesChecked").catch(() => {
             // Metrics sync should not block resume extraction.
@@ -1919,4 +1981,6 @@ export default function ResumeBuilder({
     </div>
   );
 }
+
+
 

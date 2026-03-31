@@ -1,7 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-
-const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/resume`;
+import { requestResumeApi } from "../api/resumeApi";
 
 function formatDate(value) {
   const parsed = new Date(value);
@@ -21,12 +20,7 @@ export default function History({ navigate, user, onLogout }) {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${API_BASE}/history`);
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload.error || `Server error: ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await requestResumeApi("/history");
         if (mounted) setHistory(Array.isArray(data) ? data : []);
       } catch (err) {
         if (mounted) setError(err.message || "Failed to load analysis history.");
@@ -139,3 +133,4 @@ export default function History({ navigate, user, onLogout }) {
     </div>
   );
 }
+

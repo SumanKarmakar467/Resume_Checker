@@ -7,7 +7,7 @@ function getInitialDarkMode() {
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (stored === 'dark') return true;
   if (stored === 'light') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return true;
 }
 
 function useTheme() {

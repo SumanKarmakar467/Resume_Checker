@@ -286,7 +286,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
         >
           Upload your resume for ATS scoring, build one from scratch with our
           guided editor, or generate a fully optimized resume with AI — all in
-          one place. Built with React + Spring Boot.
+          one place. Built with React + Node.js + Express.
         </p>
 
         <div
@@ -365,7 +365,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
         <div className="section-tag"># core_features.all()</div>
         <h2 className="section-title">Three tools. One career boost.</h2>
         <p className="section-sub">
-          Built with React + Spring Boot. Powered by AI. Designed to get you hired.
+          Built with React + Node.js + Express. Powered by AI. Designed to get you hired.
         </p>
         <div
           style={{
@@ -413,7 +413,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
           <FeatureCard
             fn="fn: parse(pdf|docx|txt)"
             title="Multi-format Upload"
-            desc="Spring Boot backend handles PDF, DOCX, and plain text with full fidelity parsing. No content lost in translation."
+            desc="Node.js + Express backend handles PDF, DOCX, and plain text with full fidelity parsing. No content lost in translation."
             tag="existing feature ✓"
             tagType="green"
           />
@@ -514,7 +514,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
                     <span style={{ color: "var(--o)" }}>Docker, CI/CD, REST</span>
                     <br />
                     ✓ strong:{" "}
-                    <span style={{ color: "var(--g)" }}>Spring Boot, React, Java</span>
+                    <span style={{ color: "var(--g)" }}>Node.js + Express, React, Java</span>
                     <br />→ add{" "}
                     <span style={{ color: "var(--c)" }}>2 impact verbs</span> to boost
                   </div>
@@ -534,7 +534,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
                   Know exactly<br />where you stand.
                 </h3>
                 <p style={{ color: "var(--muted)", lineHeight: 1.75, fontSize: 15 }}>
-                  Our Spring Boot parser reads your resume deeply — not just keywords,
+                  Our Node.js + Express parser reads your resume deeply — not just keywords,
                   but structure, impact language, and ATS compatibility rules that most
                   tools miss.
                 </p>
@@ -772,9 +772,10 @@ export default function LandingPage({ navigate, user, onLogout }) {
             color: "var(--muted)",
           }}
         >
-          React · Spring Boot · Java · Vercel · open source · made in India 🇮🇳
+          React · Node.js + Express · Java · Vercel · open source · made in India 🇮🇳
         </p>
       </footer>
     </div>
   );
 }
+

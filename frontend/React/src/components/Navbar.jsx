@@ -1,4 +1,7 @@
-﻿export default function Navbar({ navigate, user, onLogout }) {
+import useTheme from "../hooks/useTheme";
+
+export default function Navbar({ navigate, user, onLogout }) {
+  const { isDark, toggleTheme } = useTheme();
   const adminEmail = String(import.meta.env.VITE_ADMIN_EMAIL || "").trim().toLowerCase();
   const isAdmin = Boolean(
     user?.isAdmin || (adminEmail && String(user?.email || "").toLowerCase() === adminEmail)
@@ -26,6 +29,15 @@
       </div>
 
       <div className="nav-right">
+        <button
+          className="btn-ghost"
+          onClick={toggleTheme}
+          style={{ fontSize: 11, padding: "6px 10px" }}
+          title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+        >
+          {isDark ? "light()" : "dark()"}
+        </button>
+
         {user ? (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div

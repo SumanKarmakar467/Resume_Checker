@@ -32,15 +32,18 @@ app.use(notFound);
 app.use(errorHandler);
 
 async function start() {
+  let dbConnected = false;
   try {
-    await connectDb();
-    app.listen(PORT, () => {
-      console.log(`[server] running on http://localhost:${PORT}`);
-    });
+    dbConnected = await connectDb();
   } catch (error) {
-    console.error('[server] failed to start:', error.message);
-    process.exit(1);
+    console.warn(`[server] MongoDB unavailable: ${error.message}`);
+    console.warn('[server] Continuing in in-memory mode.');
   }
+
+  app.listen(PORT, () => {
+    console.log(`[server] running on http://localhost:${PORT}`);
+    console.log(`[server] storage mode: ${dbConnected ? 'mongodb' : 'in-memory'}`);
+  });
 }
 
 start();

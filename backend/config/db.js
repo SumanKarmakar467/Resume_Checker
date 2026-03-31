@@ -5,7 +5,8 @@ async function connectDb() {
   const mongoUri = process.env.MONGODB_URI;
 
   if (!mongoUri) {
-    throw new Error('MONGODB_URI is missing. Add it to backend/.env.');
+    console.warn('[db] MONGODB_URI is missing. Running without MongoDB (in-memory mode).');
+    return false;
   }
 
   mongoose.set('strictQuery', true);
@@ -15,6 +16,7 @@ async function connectDb() {
   });
 
   console.log('[db] MongoDB connected');
+  return true;
 }
 
 module.exports = connectDb;

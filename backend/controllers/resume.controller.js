@@ -2,9 +2,11 @@
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
+const mongoose = require('mongoose');
 
 const ResumeAnalysis = require('../models/ResumeAnalysis');
 const { analyzeResume, generateAtsResume } = require('../services/resume.service');
+const { saveHistory, getHistory } = require('../services/history.store');
 
 async function extractTextFromFile(file) {
   if (!file || !file.buffer) {
@@ -62,7 +64,7 @@ async function analyzeResumeController(req, res, next) {
     const analysis = await analyzeResume(resumeText, jobDescription);
     const optimizedResume = analysis.optimizedResume || (await generateAtsResume(resumeText, jobDescription));
 
-    const saved = await ResumeAnalysis.create({
+    const payload = {
       filename: file.originalname,
       resumeText,
       jobDescription,
@@ -72,7 +74,12 @@ async function analyzeResumeController(req, res, next) {
       feedback: analysis.feedback,
       suggestions: analysis.suggestions,
       optimizedResume,
-    });
+    };
+
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    const saved = isMongoConnected
+      ? await ResumeAnalysis.create(payload)
+      : saveHistory(payload);
 
     return res.status(200).json({
       id: saved._id,
@@ -111,9 +118,12 @@ async function generateAtsController(req, res, next) {
 
 async function getHistoryController(req, res, next) {
   try {
-    const history = await ResumeAnalysis.find({})
-      .sort({ createdAt: -1 })
-      .lean();
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    const history = isMongoConnected
+      ? await ResumeAnalysis.find({})
+          .sort({ createdAt: -1 })
+          .lean()
+      : getHistory();
 
     return res.status(200).json(history);
   } catch (error) {
