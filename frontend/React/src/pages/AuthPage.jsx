@@ -1,57 +1,66 @@
-import { useState } from "react";
+﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import { useAuthContext } from "../context/AuthContext";
 
-const API_BASE = "http://localhost:8080/api/auth";
+const PAGE_ROUTES = {
+  landing: "/",
+  upload: "/upload",
+  builder: "/builder",
+  result: "/result",
+  auth: "/login",
+  admin: "/admin",
+};
 
-export default function AuthPage({ navigate, setUser }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
+export default function AuthPage({ initialMode = "login" }) {
+  const navigate = useNavigate();
+  const { login, signup } = useAuthContext();
+
+  const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const update = (k, v) => setForm({ ...form, [k]: v });
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  const appNavigate = (target) => {
+    navigate(PAGE_ROUTES[target] || "/");
+  };
+
+  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSubmit = async () => {
-    if (!form.email || !form.password) {
+    if (!form.email.trim() || !form.password.trim()) {
       setError("email and password are required.");
       return;
     }
+
+    if (mode === "register" && form.password.trim().length < 6) {
+      setError("password must be at least 6 characters.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+
     try {
-      const endpoint = mode === "login" ? "/login" : "/register";
-      const body =
-        mode === "login"
-          ? { email: form.email, password: form.password }
-          : { name: form.name, email: form.email, password: form.password };
-
-      const res = await fetch(`${API_BASE}${endpoint}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || `Error ${res.status}`);
+      if (mode === "login") {
+        await login(form.email.trim(), form.password.trim());
+      } else {
+        await signup(form.email.trim(), form.password.trim(), form.name.trim());
       }
-
-      const data = await res.json();
-      // Store JWT token
-      if (data.token) localStorage.setItem("jwt_token", data.token);
-      const authUser = {
-        email: data.email || form.email,
-        name: data.name || form.name || form.email,
-        token: data.token,
-      };
-      localStorage.setItem(
-        "resume_ai_user",
-        JSON.stringify({ email: authUser.email, name: authUser.name })
-      );
-      setUser(authUser);
-      navigate("landing");
+      navigate("/");
     } catch (err) {
-      setError(err.message || "Authentication failed. Make sure the backend is running.");
+      const code = err?.code || "";
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("invalid email or password.");
+      } else if (code === "auth/email-already-in-use") {
+        setError("email already exists. please login instead.");
+      } else {
+        setError(err?.message || "authentication failed. please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +68,7 @@ export default function AuthPage({ navigate, setUser }) {
 
   return (
     <div>
-      <Navbar navigate={navigate} />
+      <Navbar navigate={appNavigate} />
 
       <div
         style={{
@@ -75,7 +84,6 @@ export default function AuthPage({ navigate, setUser }) {
         <div className="grid-bg" />
 
         <div style={{ width: "100%", maxWidth: 440, animation: "fadeUp 0.5s ease" }}>
-          {/* Header */}
           <div style={{ textAlign: "center", marginBottom: "2rem" }}>
             <div
               style={{
@@ -92,78 +100,16 @@ export default function AuthPage({ navigate, setUser }) {
             </h1>
             <p style={{ color: "var(--muted)", fontSize: 14 }}>
               {mode === "login"
-                ? "Sign in to save your resumes and track your ATS scores."
-                : "Free forever. No credit card required."}
+                ? "Sign in to continue your ATS workflow."
+                : "Register once and keep all resume progress synced."}
             </p>
           </div>
 
-          {/* Card */}
           <div className="card">
             <div className="card-head">
-              $ auth.{mode}() —{" "}
-              <span style={{ color: "var(--muted)" }}>JWT secured</span>
+              $ auth.{mode}() - <span style={{ color: "var(--muted)" }}>persistent session</span>
             </div>
             <div style={{ padding: "1.75rem" }}>
-              {/* OAuth */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.25rem" }}>
-                {[
-                  { icon: "🐙", label: "Continue with GitHub" },
-                  { icon: "🔵", label: "Continue with Google" },
-                ].map(({ icon, label }) => (
-                  <button
-                    key={label}
-                    style={{
-                      width: "100%",
-                      background: "var(--d3)",
-                      border: "1px solid var(--border)",
-                      color: "var(--text)",
-                      fontSize: 13,
-                      padding: "10px",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                      fontFamily: "var(--font-main)",
-                      transition: "border-color 0.2s",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.borderColor = "var(--c)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.borderColor = "var(--border)")
-                    }
-                    onClick={() => setError("OAuth coming soon — use email login for now.")}
-                  >
-                    {icon} &nbsp; {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Divider */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  margin: "1.25rem 0",
-                }}
-              >
-                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    color: "var(--muted)",
-                  }}
-                >
-                  // or with email
-                </span>
-                <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-              </div>
-
-              {/* Form */}
               {mode === "register" && (
                 <div className="form-group">
                   <label className="form-label">full_name</label>
@@ -172,7 +118,7 @@ export default function AuthPage({ navigate, setUser }) {
                     type="text"
                     placeholder="Suman Karmakar"
                     value={form.name}
-                    onChange={(e) => update("name", e.target.value)}
+                    onChange={(event) => update("name", event.target.value)}
                   />
                 </div>
               )}
@@ -184,7 +130,7 @@ export default function AuthPage({ navigate, setUser }) {
                   type="email"
                   placeholder="you@example.com"
                   value={form.email}
-                  onChange={(e) => update("email", e.target.value)}
+                  onChange={(event) => update("email", event.target.value)}
                 />
               </div>
 
@@ -193,14 +139,15 @@ export default function AuthPage({ navigate, setUser }) {
                 <input
                   className="form-input"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="........"
                   value={form.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                  onChange={(event) => update("password", event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleSubmit();
+                  }}
                 />
               </div>
 
-              {/* Error */}
               {error && (
                 <div
                   style={{
@@ -214,11 +161,10 @@ export default function AuthPage({ navigate, setUser }) {
                     marginBottom: "1rem",
                   }}
                 >
-                  ✗ {error}
+                  x {error}
                 </div>
               )}
 
-              {/* Submit */}
               <button
                 className="btn-primary"
                 style={{
@@ -233,11 +179,10 @@ export default function AuthPage({ navigate, setUser }) {
                 {loading
                   ? "authenticating..."
                   : mode === "login"
-                  ? "→ login --jwt-secured"
-                  : "→ create_account()"}
+                  ? "-> login()"
+                  : "-> create_account()"}
               </button>
 
-              {/* Toggle */}
               <div
                 style={{
                   textAlign: "center",
@@ -247,19 +192,20 @@ export default function AuthPage({ navigate, setUser }) {
                   color: "var(--muted)",
                 }}
               >
-                {mode === "login" ? "no account?" : "already have one?"}{" "}
+                {mode === "login" ? "no account?" : "already have one?"} {" "}
                 <span
                   style={{ color: "var(--g)", cursor: "pointer" }}
                   onClick={() => {
-                    setMode(mode === "login" ? "register" : "login");
+                    const nextMode = mode === "login" ? "register" : "login";
+                    setMode(nextMode);
                     setError("");
+                    navigate(nextMode === "login" ? "/login" : "/register");
                   }}
                 >
                   {mode === "login" ? "register()" : "login()"}
                 </span>
               </div>
 
-              {/* JWT note */}
               <div
                 style={{
                   textAlign: "center",
@@ -269,12 +215,11 @@ export default function AuthPage({ navigate, setUser }) {
                   color: "var(--muted)",
                 }}
               >
-                🔒 JWT-secured · no tracking · your data stays yours
+                persistent auth enabled via local session
               </div>
             </div>
           </div>
 
-          {/* Skip link */}
           <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
             <span
               style={{
@@ -283,9 +228,9 @@ export default function AuthPage({ navigate, setUser }) {
                 color: "var(--muted)",
                 cursor: "pointer",
               }}
-              onClick={() => navigate("upload")}
+              onClick={() => appNavigate("upload")}
             >
-              skip → use without account
+              continue_as_guest - analyze once
             </span>
           </div>
         </div>
