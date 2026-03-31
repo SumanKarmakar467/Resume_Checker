@@ -215,10 +215,10 @@ function TerminalHero() {
 }
 
 /* ── MAIN LANDING PAGE ── */
-export default function LandingPage({ navigate, user }) {
+export default function LandingPage({ navigate, user, onLogout }) {
   return (
     <div>
-      <Navbar navigate={navigate} user={user} />
+      <Navbar navigate={navigate} user={user} onLogout={onLogout} />
 
       {/* HERO */}
       <section
