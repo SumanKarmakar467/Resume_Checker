@@ -77,9 +77,10 @@ public class ResumeAnalysisService {
      *
      * @param resumeText raw extracted resume text
      * @param jobDescription target job description text
-     * @return generated ATS-friendly resume draft
+     * @param templateName selected resume template name
+     * @return generated ATS-friendly resume HTML
      */
-    public String generateAtsFriendlyResume(String resumeText, String jobDescription) {
+    public String generateAtsFriendlyResume(String resumeText, String jobDescription, String templateName) {
         String safeResume = resumeText == null ? "" : resumeText;
         String normalized = normalize(safeResume);
         List<String> keywords = extractKeywords(jobDescription);
@@ -93,46 +94,454 @@ public class ResumeAnalysisService {
         List<String> skillKeywords = keywords.subList(0, Math.min(10, keywords.size()));
         List<String> noteKeywords = missingKeywords.subList(0, Math.min(15, missingKeywords.size()));
 
-        StringBuilder output = new StringBuilder();
-        output.append(name).append("\n")
-                .append(email).append(" | ").append(phone).append("\n\n")
-                .append("PROFESSIONAL SUMMARY\n")
-                .append("Results-driven professional with experience delivering measurable outcomes and collaborating across teams. ");
-
+        String summary = "Results-driven professional with experience delivering measurable outcomes and collaborating across teams.";
         if (!summaryKeywords.isEmpty()) {
-            output.append("Core focus areas include ").append(String.join(", ", summaryKeywords)).append(".\n\n");
+            summary += " Core focus areas include " + String.join(", ", summaryKeywords) + ".";
         } else {
-            output.append("Experienced in aligning deliverables with role-specific requirements.\n\n");
+            summary += " Experienced in aligning deliverables with role-specific requirements.";
         }
 
-        output.append("CORE SKILLS\n");
-        if (!skillKeywords.isEmpty()) {
-            for (String skill : skillKeywords) {
-                output.append("- ").append(capitalize(skill)).append("\n");
-            }
-        } else {
-            output.append("- Communication\n- Problem Solving\n- Team Collaboration\n");
-        }
+        List<String> skills = !skillKeywords.isEmpty()
+                ? skillKeywords.stream().map(this::capitalize).toList()
+                : List.of("Communication", "Problem Solving", "Team Collaboration");
 
-        output.append("\nPROFESSIONAL EXPERIENCE\n")
-                .append("Job Title | Company Name | MM/YYYY - Present\n")
-                .append("- Implemented key projects that improved process efficiency and quality metrics.\n")
-                .append("- Collaborated with stakeholders to deliver outcomes aligned with business goals.\n")
-                .append("- Used relevant tools and methods to solve problems and optimize delivery.\n\n")
-                .append("EDUCATION\n")
-                .append("Degree Name | University Name | Year\n\n")
-                .append("ATS OPTIMIZATION NOTES\n");
+        List<String> experienceBullets = List.of(
+                "Implemented key projects that improved process efficiency and quality metrics.",
+                "Collaborated with stakeholders to deliver outcomes aligned with business goals.",
+                "Used relevant tools and methods to solve problems and optimize delivery."
+        );
 
+        String notes;
         if (!noteKeywords.isEmpty()) {
-            output.append("- Add these keywords naturally in summary/experience: ")
-                    .append(String.join(", ", noteKeywords))
-                    .append("\n");
+            notes = "Add these keywords naturally in summary and experience: " + String.join(", ", noteKeywords) + ".";
         } else {
-            output.append("- Resume already contains most job-description keywords.\n");
+            notes = "Resume already contains most job-description keywords.";
         }
-        output.append("- Keep formatting simple (single column, standard headings, no text in images).\n");
 
-        return output.toString();
+        GeneratedResumeContent content = new GeneratedResumeContent(
+                name,
+                "ATS-Optimized Resume",
+                email,
+                phone,
+                summary,
+                skills,
+                experienceBullets,
+                "Job Title | Company Name | MM/YYYY - Present",
+                "Degree Name | University Name | Year",
+                notes
+        );
+
+        return renderTemplate(templateName, content);
+    }
+
+    private String renderTemplate(String templateName, GeneratedResumeContent content) {
+        String resolved = templateName == null ? "" : templateName.trim();
+        return switch (resolved) {
+            case "Modern Sidebar" -> modernSidebarTemplate(content);
+            case "Minimal Clean" -> minimalCleanTemplate(content);
+            case "With Photo - Executive" -> executiveTemplate(content);
+            case "Creative Accent" -> creativeAccentTemplate(content);
+            case "Tech / Developer" -> techDeveloperTemplate(content);
+            case "Classic Professional" -> classicProfessionalTemplate(content);
+            default -> classicProfessionalTemplate(content);
+        };
+    }
+
+    private String classicProfessionalTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { font-family: Arial, sans-serif; margin: 0; padding: 28px; color: #1f2937; background: #ffffff; }
+                    .name { font-size: 30px; font-weight: 700; margin-bottom: 4px; }
+                    .title { color: #2563eb; font-weight: 600; margin-bottom: 8px; }
+                    .contact { font-size: 13px; color: #334155; margin-bottom: 20px; }
+                    h2 { color: #1d4ed8; font-size: 15px; letter-spacing: 0.08em; margin: 18px 0 8px; text-transform: uppercase; }
+                    p { margin: 0 0 10px; line-height: 1.55; font-size: 14px; }
+                    ul { margin: 0; padding-left: 20px; }
+                    li { margin: 6px 0; line-height: 1.45; font-size: 14px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="name">%s</div>
+                  <div class="title">%s</div>
+                  <div class="contact">%s | %s</div>
+                  <h2>Professional Summary</h2>
+                  <p>%s</p>
+                  <h2>Core Skills</h2>
+                  <ul>%s</ul>
+                  <h2>Professional Experience</h2>
+                  <p><strong>%s</strong></p>
+                  <ul>%s</ul>
+                  <h2>Education</h2>
+                  <p>%s</p>
+                  <h2>ATS Notes</h2>
+                  <p>%s</p>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                html(content.summary()),
+                htmlListItems(content.skills()),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String modernSidebarTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #f8fafc; color: #0f172a; }
+                    .wrap { display: grid; grid-template-columns: 30% 70%; min-height: 100vh; }
+                    .sidebar { background: #111827; color: #e5e7eb; padding: 28px 22px; }
+                    .main { background: #ffffff; padding: 28px; }
+                    .name { font-size: 26px; font-weight: 700; margin-bottom: 4px; color: #ffffff; }
+                    .title { font-size: 13px; color: #93c5fd; margin-bottom: 16px; }
+                    .label { font-size: 11px; letter-spacing: 0.1em; color: #9ca3af; text-transform: uppercase; margin: 16px 0 8px; }
+                    .sidebar p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; }
+                    h2 { margin: 0 0 10px; color: #1d4ed8; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+                    .section { margin-bottom: 18px; }
+                    ul { margin: 0; padding-left: 20px; }
+                    li { margin: 6px 0; font-size: 14px; line-height: 1.45; }
+                    .skills { display: flex; flex-wrap: wrap; gap: 6px; }
+                    .tag { padding: 4px 8px; border-radius: 999px; background: #1f2937; color: #dbeafe; font-size: 11px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="wrap">
+                    <aside class="sidebar">
+                      <div class="name">%s</div>
+                      <div class="title">%s</div>
+                      <div class="label">Contact</div>
+                      <p>%s</p>
+                      <p>%s</p>
+                      <div class="label">Skills</div>
+                      <div class="skills">%s</div>
+                    </aside>
+                    <main class="main">
+                      <section class="section">
+                        <h2>Professional Summary</h2>
+                        <p>%s</p>
+                      </section>
+                      <section class="section">
+                        <h2>Experience</h2>
+                        <p><strong>%s</strong></p>
+                        <ul>%s</ul>
+                      </section>
+                      <section class="section">
+                        <h2>Education</h2>
+                        <p>%s</p>
+                      </section>
+                      <section class="section">
+                        <h2>ATS Notes</h2>
+                        <p>%s</p>
+                      </section>
+                    </main>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                htmlTags(content.skills(), "tag"),
+                html(content.summary()),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String minimalCleanTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { margin: 0; padding: 34px; font-family: Arial, sans-serif; color: #111827; background: #ffffff; }
+                    .name { font-size: 28px; font-weight: 600; letter-spacing: 0.02em; margin-bottom: 4px; }
+                    .title { font-size: 14px; margin-bottom: 8px; color: #374151; }
+                    .contact { font-size: 13px; color: #4b5563; margin-bottom: 18px; }
+                    hr { border: none; border-top: 1px solid #e5e7eb; margin: 14px 0; }
+                    h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; margin: 0 0 8px; }
+                    p { margin: 0 0 8px; line-height: 1.7; font-size: 14px; }
+                    ul { margin: 0; padding-left: 18px; }
+                    li { margin: 5px 0; font-size: 14px; line-height: 1.6; }
+                  </style>
+                </head>
+                <body>
+                  <div class="name">%s</div>
+                  <div class="title">%s</div>
+                  <div class="contact">%s | %s</div>
+                  <hr />
+                  <h2>Summary</h2>
+                  <p>%s</p>
+                  <hr />
+                  <h2>Skills</h2>
+                  <ul>%s</ul>
+                  <hr />
+                  <h2>Experience</h2>
+                  <p><strong>%s</strong></p>
+                  <ul>%s</ul>
+                  <hr />
+                  <h2>Education</h2>
+                  <p>%s</p>
+                  <hr />
+                  <h2>ATS Notes</h2>
+                  <p>%s</p>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                html(content.summary()),
+                htmlListItems(content.skills()),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String executiveTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { margin: 0; font-family: 'Trebuchet MS', sans-serif; color: #111827; background: #f8fafc; }
+                    .header { background: #0f172a; color: #f8fafc; padding: 28px; display: flex; align-items: center; gap: 18px; }
+                    .photo { width: 64px; height: 64px; border-radius: 50%; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 10px; letter-spacing: 0.1em; color: #cbd5e1; }
+                    .name { font-size: 30px; font-weight: 700; margin-bottom: 3px; }
+                    .title { font-size: 14px; color: #cbd5e1; }
+                    .body { padding: 28px; background: #ffffff; }
+                    h2 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #1e293b; border-left: 4px solid #334155; padding-left: 8px; }
+                    .contact { margin-bottom: 16px; font-size: 13px; color: #334155; }
+                    .section { margin-bottom: 18px; }
+                    p { margin: 0 0 8px; line-height: 1.55; font-size: 14px; }
+                    ul { margin: 0; padding-left: 20px; }
+                    li { margin: 6px 0; line-height: 1.45; font-size: 14px; }
+                  </style>
+                </head>
+                <body>
+                  <header class="header">
+                    <div class="photo">PHOTO</div>
+                    <div>
+                      <div class="name">%s</div>
+                      <div class="title">%s</div>
+                    </div>
+                  </header>
+                  <main class="body">
+                    <div class="contact">%s | %s</div>
+                    <section class="section">
+                      <h2>Executive Summary</h2>
+                      <p>%s</p>
+                    </section>
+                    <section class="section">
+                      <h2>Core Competencies</h2>
+                      <ul>%s</ul>
+                    </section>
+                    <section class="section">
+                      <h2>Professional Experience</h2>
+                      <p><strong>%s</strong></p>
+                      <ul>%s</ul>
+                    </section>
+                    <section class="section">
+                      <h2>Education</h2>
+                      <p>%s</p>
+                    </section>
+                    <section class="section">
+                      <h2>ATS Notes</h2>
+                      <p>%s</p>
+                    </section>
+                  </main>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                html(content.summary()),
+                htmlListItems(content.skills()),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String creativeAccentTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { margin: 0; padding: 30px; font-family: 'Segoe UI', sans-serif; background: #fff7fb; color: #1f2937; }
+                    .name { font-size: 30px; font-weight: 700; margin-bottom: 4px; color: #9f1239; }
+                    .title { font-size: 14px; color: #be123c; margin-bottom: 10px; }
+                    .contact { font-size: 13px; color: #4b5563; margin-bottom: 20px; }
+                    .section { border-left: 5px solid #e11d48; background: #ffffff; padding: 10px 12px; margin-bottom: 12px; border-radius: 6px; }
+                    h2 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: #9f1239; }
+                    p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; }
+                    ul { margin: 0; padding-left: 20px; }
+                    li { margin: 5px 0; font-size: 14px; line-height: 1.45; }
+                  </style>
+                </head>
+                <body>
+                  <div class="name">%s</div>
+                  <div class="title">%s</div>
+                  <div class="contact">%s | %s</div>
+                  <section class="section">
+                    <h2>Professional Summary</h2>
+                    <p>%s</p>
+                  </section>
+                  <section class="section">
+                    <h2>Skills</h2>
+                    <ul>%s</ul>
+                  </section>
+                  <section class="section">
+                    <h2>Experience</h2>
+                    <p><strong>%s</strong></p>
+                    <ul>%s</ul>
+                  </section>
+                  <section class="section">
+                    <h2>Education</h2>
+                    <p>%s</p>
+                  </section>
+                  <section class="section">
+                    <h2>ATS Notes</h2>
+                    <p>%s</p>
+                  </section>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                html(content.summary()),
+                htmlListItems(content.skills()),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String techDeveloperTemplate(GeneratedResumeContent content) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="UTF-8" />
+                  <style>
+                    body { margin: 0; background: #020617; color: #e2e8f0; font-family: 'Courier New', monospace; }
+                    .header { background: #0f172a; padding: 20px 24px; border-bottom: 1px solid #334155; }
+                    .name { font-size: 28px; font-weight: 700; color: #22d3ee; margin-bottom: 4px; }
+                    .title { font-size: 13px; color: #94a3b8; }
+                    .contact { font-size: 12px; color: #cbd5e1; margin-top: 8px; }
+                    .container { padding: 22px 24px 28px; }
+                    .section { margin-bottom: 16px; }
+                    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #22d3ee; margin: 0 0 8px; }
+                    p { margin: 0 0 8px; font-size: 13px; line-height: 1.55; }
+                    ul { margin: 0; padding-left: 20px; }
+                    li { margin: 5px 0; font-size: 13px; line-height: 1.45; }
+                    .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+                    .tag { border: 1px solid #0891b2; color: #67e8f9; background: #082f49; border-radius: 6px; padding: 2px 6px; font-size: 11px; }
+                  </style>
+                </head>
+                <body>
+                  <header class="header">
+                    <div class="name">%s</div>
+                    <div class="title">%s</div>
+                    <div class="contact">%s | %s</div>
+                  </header>
+                  <div class="container">
+                    <section class="section">
+                      <h2>// summary</h2>
+                      <p>%s</p>
+                    </section>
+                    <section class="section">
+                      <h2>// skill_tags</h2>
+                      <div class="tags">%s</div>
+                    </section>
+                    <section class="section">
+                      <h2>// experience</h2>
+                      <p><strong>%s</strong></p>
+                      <ul>%s</ul>
+                    </section>
+                    <section class="section">
+                      <h2>// education</h2>
+                      <p>%s</p>
+                    </section>
+                    <section class="section">
+                      <h2>// ats_notes</h2>
+                      <p>%s</p>
+                    </section>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                html(content.name()),
+                html(content.title()),
+                html(content.email()),
+                html(content.phone()),
+                html(content.summary()),
+                htmlTags(content.skills(), "tag"),
+                html(content.experienceHeader()),
+                htmlListItems(content.experienceBullets()),
+                html(content.educationLine()),
+                html(content.optimizationNotes())
+        );
+    }
+
+    private String htmlListItems(List<String> values) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            builder.append("<li>").append(html(value)).append("</li>");
+        }
+        return builder.toString();
+    }
+
+    private String htmlTags(List<String> values, String className) {
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            builder.append("<span class=\"")
+                    .append(className)
+                    .append("\">")
+                    .append(html(value))
+                    .append("</span>");
+        }
+        return builder.toString();
+    }
+
+    private String html(String value) {
+        if (value == null) return "";
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private String normalize(String text) {
@@ -495,6 +904,20 @@ public class ResumeAnalysisService {
     private String capitalize(String value) {
         if (value == null || value.isEmpty()) return value;
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    private record GeneratedResumeContent(
+            String name,
+            String title,
+            String email,
+            String phone,
+            String summary,
+            List<String> skills,
+            List<String> experienceBullets,
+            String experienceHeader,
+            String educationLine,
+            String optimizationNotes
+    ) {
     }
 
     private record KeywordResult(

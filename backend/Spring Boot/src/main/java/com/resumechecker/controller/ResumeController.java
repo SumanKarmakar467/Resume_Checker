@@ -93,7 +93,8 @@ public class ResumeController {
     public GenerateResumeResponse generateAts(@RequestBody GenerateResumeRequest request) {
         String generatedResume = analysisService.generateAtsFriendlyResume(
                 request.resumeText(),
-                request.jobDescription()
+                request.jobDescription(),
+                request.templateName()
         );
         return new GenerateResumeResponse(generatedResume);
     }
