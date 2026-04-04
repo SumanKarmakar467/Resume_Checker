@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import UploadResume from "./pages/UploadResume";
@@ -14,6 +14,7 @@ import "./index.css";
 import "./styles/global.css";
 
 const GUEST_USAGE_KEY = "resume_ai_guest_usage";
+const ANALYSIS_RESULT_KEY = "resume_ai_latest_analysis";
 
 const PAGE_ROUTES = {
   landing: "/",
@@ -37,6 +38,15 @@ function loadGuestUsage() {
   }
 }
 
+function loadLatestAnalysis() {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(ANALYSIS_RESULT_KEY) || "null");
+    return stored && typeof stored === "object" ? stored : null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 function useLegacyNavigate() {
   const navigate = useNavigate();
   return (page) => navigate(PAGE_ROUTES[page] || "/");
@@ -46,8 +56,20 @@ function AppRoutes() {
   const navigate = useNavigate();
   const legacyNavigate = useLegacyNavigate();
   const { currentUser, logout } = useAuthContext();
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisResult, setAnalysisResult] = useState(() => loadLatestAnalysis());
   const [guestUsage, setGuestUsage] = useState(() => loadGuestUsage());
+
+  useEffect(() => {
+    try {
+      if (!analysisResult) {
+        sessionStorage.removeItem(ANALYSIS_RESULT_KEY);
+        return;
+      }
+      sessionStorage.setItem(ANALYSIS_RESULT_KEY, JSON.stringify(analysisResult));
+    } catch (_err) {
+      // Ignore storage write failures.
+    }
+  }, [analysisResult]);
 
   const consumeGuestTry = (featureKey) => {
     if (currentUser) return true;
@@ -129,3 +151,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+
