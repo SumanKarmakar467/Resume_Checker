@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import { requestResumeApi } from "../api/resumeApi";
+import { requestHistory } from "../api/resumeApi";
 
 function formatDate(value) {
   const parsed = new Date(value);
@@ -12,6 +12,8 @@ export default function History({ navigate, user, onLogout }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [limit, setLimit] = useState(25);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -20,7 +22,7 @@ export default function History({ navigate, user, onLogout }) {
       setLoading(true);
       setError("");
       try {
-        const data = await requestResumeApi("/history");
+        const data = await requestHistory({ limit });
         if (mounted) setHistory(Array.isArray(data) ? data : []);
       } catch (err) {
         if (mounted) setError(err.message || "Failed to load analysis history.");
@@ -34,7 +36,7 @@ export default function History({ navigate, user, onLogout }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [limit, refreshTick]);
 
   return (
     <div>
@@ -55,6 +57,51 @@ export default function History({ navigate, user, onLogout }) {
           <h1 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700 }}>
             Past Resume Analyses
           </h1>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            marginBottom: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <label
+              htmlFor="history-limit"
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--muted)",
+              }}
+            >
+              max_items
+            </label>
+            <select
+              id="history-limit"
+              className="form-input"
+              style={{ maxWidth: 110, padding: "8px 10px" }}
+              value={limit}
+              onChange={(event) => setLimit(Number(event.target.value))}
+              disabled={loading}
+            >
+              {[10, 25, 50].map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="btn-ghost"
+            onClick={() => setRefreshTick((value) => value + 1)}
+            disabled={loading}
+          >
+            {loading ? "refreshing..." : "refresh()"}
+          </button>
         </div>
 
         {loading ? (
