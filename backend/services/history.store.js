@@ -12,8 +12,9 @@ function saveHistory(record) {
   return item;
 }
 
-function getHistory() {
-  return [...memoryHistory];
+function getHistory(limit = 25) {
+  const safeLimit = Number.isFinite(Number(limit)) ? Math.min(Math.max(Number(limit), 1), 100) : 25;
+  return memoryHistory.slice(0, safeLimit);
 }
 
 module.exports = {

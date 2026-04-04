@@ -105,17 +105,32 @@ async function generateAtsController(req, res, next) {
   }
 }
 
+function parseHistoryLimit(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 25;
+  return Math.min(Math.max(Math.round(parsed), 1), 100);
+}
+
+function parseIncludeText(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
 async function getHistoryController(req, res, next) {
   try {
+    const limit = parseHistoryLimit(req.query?.limit);
+    const includeText = parseIncludeText(req.query?.includeText);
+
     const isMongoConnected = mongoose.connection.readyState === 1;
     const history = isMongoConnected
       ? await ResumeAnalysis.find({})
           .sort({ createdAt: -1 })
+          .limit(limit)
           .lean()
-      : getHistory();
+      : getHistory(limit);
 
     return res.status(200).json(history.map((item) => toAnalysisResponse(item, {
-      includeText: true,
+      includeText,
       includeOptimizedResume: true,
     })));
   } catch (error) {
