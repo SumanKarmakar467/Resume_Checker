@@ -7,6 +7,7 @@ const mongoose = require('mongoose');
 const ResumeAnalysis = require('../models/ResumeAnalysis');
 const { analyzeResume, generateAtsResume } = require('../services/resume.service');
 const { saveHistory, getHistory } = require('../services/history.store');
+const { toAnalysisResponse } = require('../utils/analysis.serializer');
 
 async function extractTextFromFile(file) {
   if (!file || !file.buffer) {
@@ -81,19 +82,7 @@ async function analyzeResumeController(req, res, next) {
       ? await ResumeAnalysis.create(payload)
       : saveHistory(payload);
 
-    return res.status(200).json({
-      id: saved._id,
-      filename: saved.filename,
-      resumeText: saved.resumeText,
-      jobDescription: saved.jobDescription,
-      atsScore: saved.atsScore,
-      matchedKeywords: saved.matchedKeywords,
-      missingKeywords: saved.missingKeywords,
-      feedback: saved.feedback,
-      suggestions: saved.suggestions,
-      optimizedResume: saved.optimizedResume,
-      createdAt: saved.createdAt,
-    });
+    return res.status(200).json(toAnalysisResponse(saved, { includeText: true, includeOptimizedResume: true }));
   } catch (error) {
     return next(error);
   }
@@ -125,7 +114,10 @@ async function getHistoryController(req, res, next) {
           .lean()
       : getHistory();
 
-    return res.status(200).json(history);
+    return res.status(200).json(history.map((item) => toAnalysisResponse(item, {
+      includeText: true,
+      includeOptimizedResume: true,
+    })));
   } catch (error) {
     return next(error);
   }
