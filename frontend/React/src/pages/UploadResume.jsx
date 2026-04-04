@@ -2,6 +2,11 @@ import { useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { incrementUserCounter } from "../services/firestoreUsers";
 import { requestResumeApi } from "../api/resumeApi";
+import { MESSAGES, RESUME_FILE_ACCEPT } from "../constants/resumeCheckerConstants";
+import {
+  isSupportedResumeFileType,
+  isWithinResumeSizeLimit,
+} from "../utils/resumeFileValidation";
 
 export default function UploadResume({
   navigate,
@@ -20,9 +25,16 @@ export default function UploadResume({
   const fileRef = useRef();
 
   const handleFile = (f) => {
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
-    if (!allowed.includes(f.type)) {
-      setError("Only PDF, DOCX, or TXT files are supported.");
+    if (!f) {
+      setError(MESSAGES.uploadRequired);
+      return;
+    }
+    if (!isSupportedResumeFileType(f)) {
+      setError(MESSAGES.uploadInvalidType);
+      return;
+    }
+    if (!isWithinResumeSizeLimit(f)) {
+      setError(MESSAGES.uploadSizeExceeded);
       return;
     }
     setError("");
@@ -191,7 +203,7 @@ export default function UploadResume({
             type="file"
             ref={fileRef}
             style={{ display: "none" }}
-            accept=".pdf,.docx,.txt"
+            accept={RESUME_FILE_ACCEPT}
             onChange={(e) => e.target.files[0] && handleFile(e.target.files[0])}
           />
           {file ? (

@@ -5,11 +5,15 @@ import Navbar from "../components/Navbar";
 import TemplateGallery from "../components/TemplateGallery";
 import { incrementUserCounter } from "../services/firestoreUsers";
 import { requestResumeApi } from "../api/resumeApi";
-const ACCEPTED_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "text/plain",
-];
+import {
+  MESSAGES,
+  RESUME_FILE_ACCEPT,
+} from "../constants/resumeCheckerConstants";
+import {
+  isSupportedResumeFileType,
+  isWithinResumeSizeLimit,
+} from "../utils/resumeFileValidation";
+
 const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 const STEPS = [
@@ -1533,7 +1537,8 @@ export default function ResumeBuilder({
   };
 
   const readExistingResumeText = async (file) => {
-    if (file.type === "text/plain") {
+    const isPlainText = file.type === "text/plain" || String(file.name || "").toLowerCase().endsWith(".txt");
+    if (isPlainText) {
       return normalizeText(await file.text());
     }
 
@@ -1591,8 +1596,12 @@ export default function ResumeBuilder({
       setError("Please select a resume file first.");
       return;
     }
-    if (!ACCEPTED_TYPES.includes(existingFile.type)) {
-      setError("Only PDF, DOCX, or TXT files are supported.");
+    if (!isSupportedResumeFileType(existingFile)) {
+      setError(MESSAGES.uploadInvalidType);
+      return;
+    }
+    if (!isWithinResumeSizeLimit(existingFile)) {
+      setError(MESSAGES.uploadSizeExceeded);
       return;
     }
 
@@ -1730,7 +1739,7 @@ export default function ResumeBuilder({
               <input
                 className="form-input"
                 type="file"
-                accept=".pdf,.docx,.txt"
+                accept={RESUME_FILE_ACCEPT}
                 onChange={(e) => {
                   setExistingFile(e.target.files?.[0] || null);
                   setImportMessage("");
