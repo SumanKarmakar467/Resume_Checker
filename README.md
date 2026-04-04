@@ -48,12 +48,13 @@ backend/
 
 ## Features
 
-- Upload resume in **PDF / DOCX / TXT**
+- Upload resume in **PDF / DOCX / TXT** (up to 10MB)
 - ATS analysis against optional job description
 - Keyword match and missing-keyword detection
 - ATS score + feedback + suggestions
 - ATS-optimized resume generation
-- Resume analysis history stored in MongoDB
+- Resume analysis history with server-side limit support
+- Automatic in-memory fallback when MongoDB is unavailable
 
 ## API Endpoints
 
@@ -73,6 +74,11 @@ Base URL: `http://localhost:5000/api/resume`
     }
     ```
 - `GET /history`
+  - query params:
+    - `limit` (optional, `1-100`, default `25`)
+    - `includeText` (optional, `1/true/yes` to include extracted resume text)
+- `GET /health`
+  - returns service status, uptime, storage mode, and MongoDB connection state
 
 ## Mongoose Schema
 
@@ -107,9 +113,11 @@ GEMINI_MODEL=gemini-1.5-flash
 ```bash
 VITE_API_URL=http://localhost:5000
 VITE_ADMIN_EMAIL=
+VITE_API_TIMEOUT_MS=20000
 ```
 
 `VITE_ADMIN_EMAIL` is optional and only used to show/hide the admin dashboard link.
+`VITE_API_TIMEOUT_MS` is optional and controls frontend API timeout in milliseconds.
 
 ## Run Locally
 
@@ -132,6 +140,20 @@ npm run dev
 ```
 
 Frontend runs on `http://localhost:5173`.
+
+## Quick Checks
+
+### Backend health
+
+```bash
+curl http://localhost:5000/health
+```
+
+### History (latest 10, without full resume text)
+
+```bash
+curl "http://localhost:5000/api/resume/history?limit=10"
+```
 
 ## Frontend Routes
 
