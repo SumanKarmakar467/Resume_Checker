@@ -14,7 +14,7 @@ const PAGE_ROUTES = {
 
 export default function AuthPage({ initialMode = "login" }) {
   const navigate = useNavigate();
-  const { login, signup } = useAuthContext();
+  const { login, signup, loginWithGoogle } = useAuthContext();
 
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -60,6 +60,26 @@ export default function AuthPage({ initialMode = "login" }) {
         setError("email already exists. please login instead.");
       } else {
         setError(err?.message || "authentication failed. please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      await loginWithGoogle();
+      navigate("/");
+    } catch (err) {
+      const code = String(err?.code || "");
+      if (code === "auth/popup-closed-by-user") {
+        setError("google sign-in was cancelled.");
+      } else if (code === "auth/popup-blocked") {
+        setError("popup blocked. allow popups and try again.");
+      } else {
+        setError(err?.message || "google sign-in failed. please try again.");
       }
     } finally {
       setLoading(false);
@@ -182,6 +202,22 @@ export default function AuthPage({ initialMode = "login" }) {
                   ? "-> login()"
                   : "-> create_account()"}
               </button>
+
+              {mode === "login" ? (
+                <button
+                  className="btn-ghost"
+                  style={{
+                    width: "100%",
+                    justifyContent: "center",
+                    fontSize: 13,
+                    marginTop: "0.7rem",
+                  }}
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  {loading ? "connecting_google..." : "-> continue_with_google()"}
+                </button>
+              ) : null}
 
               <div
                 style={{

@@ -10,6 +10,26 @@ const ADMIN_TOKEN_KEY = "resume_admin_token";
 const ADMIN_EMAIL_KEY = "resume_admin_email";
 const DEFAULT_ADMIN_EMAIL = "karmakarsuman12138@gmail.com";
 
+function EyeOpenIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M2 12C3.9 7.9 7.6 5 12 5c4.4 0 8.1 2.9 10 7-1.9 4.1-5.6 7-10 7-4.4 0-8.1-2.9-10-7Z" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function EyeClosedIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M10.6 5.2c.5-.1.9-.2 1.4-.2 4.4 0 8.1 2.9 10 7-.7 1.6-1.6 2.9-2.8 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7.1 7.1C5 8.3 3.4 10 2 12c1.9 4.1 5.6 7 10 7 1.8 0 3.5-.5 5-1.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9.9 9.9A3 3 0 0 0 14.1 14.1" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function formatDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "-";
@@ -133,6 +153,7 @@ export default function AdminPanel() {
   const [tab, setTab] = useState("users");
   const [authLoading, setAuthLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [users, setUsers] = useState([]);
   const [analyses, setAnalyses] = useState([]);
@@ -162,6 +183,7 @@ export default function AdminPanel() {
           clearAdminSession();
           setToken("");
           setLoggedInEmail("");
+          setShowPassword(false);
           setForm((prev) => ({ ...prev, password: "" }));
           setError("Admin session expired. Please login again.");
           return;
@@ -210,6 +232,7 @@ export default function AdminPanel() {
       saveAdminSession(nextToken, nextEmail);
       setToken(nextToken);
       setLoggedInEmail(nextEmail);
+      setShowPassword(false);
       setForm({ email: nextEmail, password: "" });
     } catch (err) {
       setError(err?.message || "Admin login failed.");
@@ -222,6 +245,7 @@ export default function AdminPanel() {
     clearAdminSession();
     setToken("");
     setLoggedInEmail("");
+    setShowPassword(false);
     setForm((prev) => ({ ...prev, password: "" }));
   };
 
@@ -247,18 +271,44 @@ export default function AdminPanel() {
 
           <div className="form-group">
             <label className="form-label">admin_password</label>
-            <input
-              className="form-input"
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-              placeholder="••••••••"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleLogin();
-                }
-              }}
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                className="form-input"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                placeholder="........"
+                style={{ paddingRight: 44 }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    handleLogin();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((prev) => !prev)}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: 8,
+                  transform: "translateY(-50%)",
+                  display: "grid",
+                  placeItems: "center",
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  border: "1px solid #334155",
+                  background: "#0b1020",
+                  color: "#cbd5e1",
+                  cursor: "pointer",
+                }}
+              >
+                {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
+              </button>
+            </div>
           </div>
 
           {error ? <div style={{ marginTop: 8, color: "#b91c1c", fontSize: 13 }}>{error}</div> : null}

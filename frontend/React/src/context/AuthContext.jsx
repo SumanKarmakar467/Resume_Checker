@@ -1,5 +1,7 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { syncUserDocument } from "../services/firestoreUsers";
+import { auth, googleProvider } from "../lib/firebase";
 
 const SESSION_KEY = "resume_session_user";
 const ACCOUNTS_KEY = "resume_auth_accounts";
@@ -7,12 +9,15 @@ const OWNER_UID_KEY = "resume_owner_uid";
 const DEFAULT_ADMIN_EMAIL = "karmakarsuman12138@gmail.com";
 const DEFAULT_ADMIN_PASSWORD = "Suman@2004";
 const DEFAULT_ADMIN_NAME = "Suman Admin";
+const LOCAL_AUTH_PROVIDER = "local";
+const GOOGLE_AUTH_PROVIDER = "google";
 
 const AuthContext = createContext({
   currentUser: null,
   loading: true,
   signup: async () => {},
   login: async () => {},
+  loginWithGoogle: async () => {},
   logout: async () => {},
 });
 
@@ -65,7 +70,7 @@ function saveOwnerUid(uid) {
 
 function ensureDefaultAdminAccount() {
   const safeEmail = resolveAdminEmail();
-  if (!safeEmail) return;
+  if (!safeEmail) return null;
 
   const accounts = loadAccounts();
   const existingIndex = accounts.findIndex((item) => normalizeEmail(item.email) === safeEmail);
@@ -98,21 +103,42 @@ function ensureDefaultAdminAccount() {
   return account;
 }
 
-function publicUser(account) {
+function toIsoDate(value) {
+  if (!value) return new Date().toISOString();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
+  return parsed.toISOString();
+}
+
+function publicUser(account, authProvider = LOCAL_AUTH_PROVIDER) {
   if (!account) return null;
 
   const adminEmail = resolveAdminEmail();
   const ownerUid = loadOwnerUid();
   return {
     uid: account.uid,
-    email: account.email,
-    displayName: account.displayName,
-    createdAt: account.createdAt,
+    email: normalizeEmail(account.email),
+    displayName: account.displayName || account.email || "User",
+    createdAt: toIsoDate(account.createdAt),
+    authProvider,
     isAdmin: Boolean(
       (ownerUid && account.uid === ownerUid) ||
       (adminEmail && normalizeEmail(account.email) === adminEmail)
     ),
   };
+}
+
+function publicFirebaseUser(firebaseUser) {
+  if (!firebaseUser?.uid) return null;
+  return publicUser(
+    {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email || "",
+      displayName: firebaseUser.displayName || firebaseUser.email || "Google User",
+      createdAt: toIsoDate(firebaseUser.metadata?.creationTime),
+    },
+    GOOGLE_AUTH_PROVIDER
+  );
 }
 
 export function AuthProvider({ children }) {
@@ -127,16 +153,48 @@ export function AuthProvider({ children }) {
 
     const stored = loadSessionUser();
     if (stored?.uid) {
-      const account = loadAccounts().find((item) => item.uid === stored.uid) || stored;
-      const user = publicUser(account);
-      setCurrentUser(user);
-      syncUserDocument(user).catch(() => {
-        // Ignore metrics sync failures.
-      });
+      if (stored.authProvider === GOOGLE_AUTH_PROVIDER) {
+        setCurrentUser(stored);
+      } else {
+        const account = loadAccounts().find((item) => item.uid === stored.uid) || stored;
+        setCurrentUser(publicUser(account, LOCAL_AUTH_PROVIDER));
+      }
     } else {
       setCurrentUser(null);
     }
-    setLoading(false);
+
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (firebaseUser) => {
+        if (firebaseUser) {
+          const user = publicFirebaseUser(firebaseUser);
+          if (user) {
+            saveSessionUser(user);
+            setCurrentUser(user);
+            syncUserDocument(user).catch(() => {});
+          }
+          setLoading(false);
+          return;
+        }
+
+        const sessionUser = loadSessionUser();
+        if (sessionUser?.uid && sessionUser.authProvider !== GOOGLE_AUTH_PROVIDER) {
+          const account = loadAccounts().find((item) => item.uid === sessionUser.uid) || sessionUser;
+          setCurrentUser(publicUser(account, LOCAL_AUTH_PROVIDER));
+        } else {
+          if (sessionUser?.authProvider === GOOGLE_AUTH_PROVIDER) {
+            saveSessionUser(null);
+          }
+          setCurrentUser(null);
+        }
+        setLoading(false);
+      },
+      () => {
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   const signup = async (email, password, displayName = "") => {
@@ -157,6 +215,10 @@ export function AuthProvider({ children }) {
       throw error;
     }
 
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+
     const account = {
       uid: `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
       email: safeEmail,
@@ -171,7 +233,7 @@ export function AuthProvider({ children }) {
       saveOwnerUid(account.uid);
     }
 
-    const user = publicUser(account);
+    const user = publicUser(account, LOCAL_AUTH_PROVIDER);
     saveSessionUser(user);
     setCurrentUser(user);
     await syncUserDocument(user);
@@ -192,7 +254,27 @@ export function AuthProvider({ children }) {
       throw error;
     }
 
-    const user = publicUser(account);
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+
+    const user = publicUser(account, LOCAL_AUTH_PROVIDER);
+    saveSessionUser(user);
+    setCurrentUser(user);
+    await syncUserDocument(user);
+    return user;
+  };
+
+  const loginWithGoogle = async () => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = publicFirebaseUser(result?.user);
+
+    if (!user?.uid || !user?.email) {
+      const error = new Error("Google account email is required.");
+      error.code = "auth/invalid-google-user";
+      throw error;
+    }
+
     saveSessionUser(user);
     setCurrentUser(user);
     await syncUserDocument(user);
@@ -200,6 +282,9 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
     saveSessionUser(null);
     setCurrentUser(null);
   };
@@ -210,6 +295,7 @@ export function AuthProvider({ children }) {
       loading,
       signup,
       login,
+      loginWithGoogle,
       logout,
     }),
     [currentUser, loading]
