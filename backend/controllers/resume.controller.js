@@ -1,52 +1,22 @@
-﻿// Purpose: HTTP controllers for resume analyze, generation, and history endpoints.
-const path = require('path');
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
+// Purpose: HTTP controllers for resume analyze, generation, and history endpoints.
 const mongoose = require('mongoose');
 
 const ResumeAnalysis = require('../models/ResumeAnalysis');
 const { analyzeResume, generateAtsResume } = require('../services/resume.service');
 const { saveHistory, getHistory } = require('../services/history.store');
 const { toAnalysisResponse } = require('../utils/analysis.serializer');
-
-async function extractTextFromFile(file) {
-  if (!file || !file.buffer) {
-    const error = new Error('Resume file is missing.');
-    error.status = 400;
-    throw error;
-  }
-
-  const originalName = String(file.originalname || '').toLowerCase();
-  const extension = path.extname(originalName);
-
-  const isPdf = file.mimetype === 'application/pdf' || extension === '.pdf';
-  const isDocx =
-    file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    extension === '.docx';
-  const isTxt = file.mimetype === 'text/plain' || extension === '.txt';
-
-  if (isPdf) {
-    const data = await pdfParse(file.buffer);
-    return String(data.text || '').trim();
-  }
-
-  if (isDocx) {
-    const data = await mammoth.extractRawText({ buffer: file.buffer });
-    return String(data.value || '').trim();
-  }
-
-  if (isTxt) {
-    return file.buffer.toString('utf8').trim();
-  }
-
-  const error = new Error('Unsupported file type. Upload PDF, DOCX, or TXT.');
-  error.status = 400;
-  throw error;
-}
+const { extractTextFromFile, parseStructuredResumeData, normalizeText } = require('../services/resumeParser');
+const {
+  normalizeUserEmail,
+  createAnalysisRecord,
+  createBuildRecord,
+  incrementBuildDownload,
+  ensureUserRecord,
+} = require('../services/records.service');
 
 async function analyzeResumeController(req, res, next) {
   try {
-    const { jobDescription = '' } = req.body;
+    const { jobDescription = '', userEmail = '' } = req.body || {};
     const file = req.file;
 
     if (!file) {
@@ -63,26 +33,82 @@ async function analyzeResumeController(req, res, next) {
     }
 
     const analysis = await analyzeResume(resumeText, jobDescription);
-    const optimizedResume = analysis.optimizedResume || (await generateAtsResume(resumeText, jobDescription));
+    const generated =
+      analysis.optimizedResume && analysis.structuredResume
+        ? {
+            optimizedResume: analysis.optimizedResume,
+            structuredResume: analysis.structuredResume,
+          }
+        : await generateAtsResume(analysis.structuredResume || resumeText, jobDescription, {
+            sourceResumeText: resumeText,
+            templateName: 'General ATS Resume',
+          });
+
+    const normalizedEmail = normalizeUserEmail(userEmail);
 
     const payload = {
       filename: file.originalname,
       resumeText,
-      jobDescription,
+      jobDescription: normalizeText(jobDescription),
+      userEmail: normalizedEmail,
       atsScore: analysis.atsScore,
       matchedKeywords: analysis.matchedKeywords,
       missingKeywords: analysis.missingKeywords,
       feedback: analysis.feedback,
       suggestions: analysis.suggestions,
-      optimizedResume,
+      optimizedResume: generated.optimizedResume,
+      structuredResume: generated.structuredResume,
     };
 
     const isMongoConnected = mongoose.connection.readyState === 1;
-    const saved = isMongoConnected
-      ? await ResumeAnalysis.create(payload)
-      : saveHistory(payload);
+    const saved = isMongoConnected ? await ResumeAnalysis.create(payload) : saveHistory(payload);
 
-    return res.status(200).json(toAnalysisResponse(saved, { includeText: true, includeOptimizedResume: true }));
+    try {
+      await createAnalysisRecord({
+        userEmail: normalizedEmail,
+        filename: file.originalname,
+        jobDescription: normalizeText(jobDescription),
+        atsScore: analysis.atsScore,
+        analyzedAt: new Date(),
+      });
+    } catch (recordError) {
+      console.warn('[records] failed to save analysis record:', recordError.message);
+    }
+
+    return res.status(200).json(
+      toAnalysisResponse(saved, {
+        includeText: true,
+        includeOptimizedResume: true,
+        includeStructuredResume: true,
+      })
+    );
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function parseBuilderResumeController(req, res, next) {
+  try {
+    const file = req.file;
+    if (!file) {
+      const error = new Error('Please upload a PDF, DOCX, or TXT resume file.');
+      error.status = 400;
+      throw error;
+    }
+
+    const resumeText = await extractTextFromFile(file);
+    if (!resumeText) {
+      const error = new Error('Could not extract text from file. Upload a text-based resume.');
+      error.status = 400;
+      throw error;
+    }
+
+    const structuredData = parseStructuredResumeData(resumeText);
+    return res.status(200).json({
+      filename: file.originalname,
+      resumeText,
+      structuredData,
+    });
   } catch (error) {
     return next(error);
   }
@@ -90,19 +116,76 @@ async function analyzeResumeController(req, res, next) {
 
 async function generateAtsController(req, res, next) {
   try {
-    const { resumeText = '', jobDescription = '', sourceResumeText = '', templateName = '' } = req.body || {};
+    const {
+      resumeText = '',
+      structuredResume = null,
+      jobDescription = '',
+      sourceResumeText = '',
+      templateName = '',
+      userEmail = '',
+    } = req.body || {};
 
-    if (!String(resumeText).trim()) {
-      const error = new Error('resumeText is required.');
+    if (!normalizeText(resumeText) && (!structuredResume || typeof structuredResume !== 'object')) {
+      const error = new Error('structuredResume or resumeText is required.');
       error.status = 400;
       throw error;
     }
 
-    const optimizedResume = await generateAtsResume(resumeText, jobDescription, {
+    const generated = await generateAtsResume(structuredResume || resumeText, jobDescription, {
       sourceResumeText,
       templateName,
     });
-    return res.status(200).json({ optimizedResume });
+
+    const normalizedEmail = normalizeUserEmail(userEmail);
+    let buildRecord = null;
+    try {
+      buildRecord = await createBuildRecord({
+        userEmail: normalizedEmail,
+        templateName: String(templateName || 'General ATS Resume'),
+        builtAt: new Date(),
+        downloadCount: 0,
+      });
+    } catch (recordError) {
+      console.warn('[records] failed to save build record:', recordError.message);
+    }
+
+    return res.status(200).json({
+      optimizedResume: generated.optimizedResume || '',
+      structuredResume: generated.structuredResume || parseStructuredResumeData(generated.optimizedResume || ''),
+      buildId: buildRecord?._id || buildRecord?.id || null,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function markBuildDownloadController(req, res, next) {
+  try {
+    const buildId = String(req.params.buildId || '').trim();
+    const userEmail = normalizeUserEmail(req.body?.userEmail);
+    if (!buildId) {
+      const error = new Error('buildId is required.');
+      error.status = 400;
+      throw error;
+    }
+
+    const updated = await incrementBuildDownload(buildId);
+    if (!updated) {
+      const error = new Error('Build record not found.');
+      error.status = 404;
+      throw error;
+    }
+
+    try {
+      await ensureUserRecord(userEmail);
+    } catch (recordError) {
+      console.warn('[records] failed to update user activity:', recordError.message);
+    }
+
+    return res.status(200).json({
+      id: updated._id || updated.id,
+      downloadCount: Number(updated.downloadCount || 0),
+    });
   } catch (error) {
     return next(error);
   }
@@ -126,16 +209,18 @@ async function getHistoryController(req, res, next) {
 
     const isMongoConnected = mongoose.connection.readyState === 1;
     const history = isMongoConnected
-      ? await ResumeAnalysis.find({})
-          .sort({ createdAt: -1 })
-          .limit(limit)
-          .lean()
+      ? await ResumeAnalysis.find({}).sort({ createdAt: -1 }).limit(limit).lean()
       : getHistory(limit);
 
-    return res.status(200).json(history.map((item) => toAnalysisResponse(item, {
-      includeText,
-      includeOptimizedResume: true,
-    })));
+    return res.status(200).json(
+      history.map((item) =>
+        toAnalysisResponse(item, {
+          includeText,
+          includeOptimizedResume: true,
+          includeStructuredResume: true,
+        })
+      )
+    );
   } catch (error) {
     return next(error);
   }
@@ -143,6 +228,8 @@ async function getHistoryController(req, res, next) {
 
 module.exports = {
   analyzeResumeController,
+  parseBuilderResumeController,
   generateAtsController,
+  markBuildDownloadController,
   getHistoryController,
 };

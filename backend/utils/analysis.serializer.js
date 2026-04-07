@@ -5,10 +5,11 @@ function toStringArray(value) {
 }
 
 function toAnalysisResponse(record = {}, options = {}) {
-  const { includeText = true, includeOptimizedResume = true } = options;
+  const { includeText = true, includeOptimizedResume = true, includeStructuredResume = false } = options;
 
   const output = {
     id: record._id || record.id || null,
+    userEmail: record.userEmail || 'anonymous',
     filename: record.filename || "",
     jobDescription: record.jobDescription || "",
     atsScore: Number.isFinite(Number(record.atsScore)) ? Number(record.atsScore) : 0,
@@ -27,10 +28,15 @@ function toAnalysisResponse(record = {}, options = {}) {
     output.optimizedResume = String(record.optimizedResume || "");
   }
 
+  if (includeStructuredResume) {
+    output.structuredResume = record.structuredResume && typeof record.structuredResume === 'object'
+      ? record.structuredResume
+      : null;
+  }
+
   return output;
 }
 
 module.exports = {
   toAnalysisResponse,
 };
-
