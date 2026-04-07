@@ -5,10 +5,8 @@ import UploadResume from "./pages/UploadResume";
 import Result from "./pages/Result";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import AuthPage from "./pages/AuthPage";
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminPanel from "./pages/AdminPanel";
 import History from "./pages/History";
-import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRoute from "./components/AdminRoute";
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import "./index.css";
 import "./styles/global.css";
@@ -131,11 +129,7 @@ function AppRoutes() {
       <Route path="/login" element={<AuthPage initialMode="login" />} />
       <Route path="/register" element={<AuthPage initialMode="register" />} />
 
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-        </Route>
-      </Route>
+      <Route path="/admin" element={<AdminPanel />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
