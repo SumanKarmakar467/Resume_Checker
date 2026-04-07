@@ -100,6 +100,14 @@ export function requestAdminApi(path, options = {}) {
   return requestApi(ADMIN_API_BASE, path, options);
 }
 
+function buildAdminHeaders(token, extraHeaders = {}) {
+  const headers = { ...extraHeaders };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export function requestHistory(options = {}) {
   const { limit = 25, includeText = false } = options;
   return requestResumeApi("/history", {
@@ -133,14 +141,28 @@ export function markBuildDownload(buildId, userEmail = "") {
   });
 }
 
-export function fetchAdminUsers() {
-  return requestAdminApi("/users");
+export function adminLogin(email, password) {
+  return requestAdminApi("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
 }
 
-export function fetchAdminAnalyses() {
-  return requestAdminApi("/analyses");
+export function fetchAdminUsers(token = "") {
+  return requestAdminApi("/users", {
+    headers: buildAdminHeaders(token),
+  });
 }
 
-export function fetchAdminBuilds() {
-  return requestAdminApi("/builds");
+export function fetchAdminAnalyses(token = "") {
+  return requestAdminApi("/analyses", {
+    headers: buildAdminHeaders(token),
+  });
+}
+
+export function fetchAdminBuilds(token = "") {
+  return requestAdminApi("/builds", {
+    headers: buildAdminHeaders(token),
+  });
 }

@@ -1,8 +1,33 @@
+const jwt = require('jsonwebtoken');
+
 const {
   getAllUsers,
   getAllAnalysisRecords,
   getAllBuildRecords,
 } = require('../services/records.service');
+
+const DEFAULT_ADMIN_EMAIL = 'karmakarsuman12138@gmail.com';
+const DEFAULT_ADMIN_PASSWORD = 'Suman@2004';
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function resolveAdminEmail() {
+  return normalizeEmail(process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL);
+}
+
+function resolveAdminPassword() {
+  return String(process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD);
+}
+
+function resolveJwtSecret() {
+  return String(process.env.JWT_SECRET || '').trim();
+}
+
+function resolveTokenTtl() {
+  return String(process.env.JWT_EXPIRES_IN || '12h').trim();
+}
 
 function mapUserRecord(item = {}) {
   return {
@@ -34,6 +59,59 @@ function mapBuildRecord(item = {}) {
   };
 }
 
+async function adminLoginController(req, res, next) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || '');
+
+    if (!email || !password) {
+      const error = new Error('Email and password are required.');
+      error.status = 400;
+      throw error;
+    }
+
+    const adminEmail = resolveAdminEmail();
+    const adminPassword = resolveAdminPassword();
+    if (!adminEmail || !adminPassword) {
+      const error = new Error('Admin credentials are not configured.');
+      error.status = 500;
+      throw error;
+    }
+
+    if (email !== adminEmail || password !== adminPassword) {
+      const error = new Error('Invalid admin email or password.');
+      error.status = 401;
+      throw error;
+    }
+
+    const jwtSecret = resolveJwtSecret();
+    if (!jwtSecret) {
+      const error = new Error('JWT secret is missing.');
+      error.status = 500;
+      throw error;
+    }
+
+    const token = jwt.sign(
+      {
+        role: 'admin',
+        email: adminEmail,
+      },
+      jwtSecret,
+      { expiresIn: resolveTokenTtl() }
+    );
+
+    return res.status(200).json({
+      token,
+      tokenType: 'Bearer',
+      admin: {
+        email: adminEmail,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function getUsersController(req, res, next) {
   try {
     const users = await getAllUsers();
@@ -62,6 +140,7 @@ async function getBuildsController(req, res, next) {
 }
 
 module.exports = {
+  adminLoginController,
   getUsersController,
   getAnalysesController,
   getBuildsController,
