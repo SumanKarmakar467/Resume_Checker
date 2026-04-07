@@ -4,7 +4,11 @@ import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
 import TemplateGallery from "../components/TemplateGallery";
 import { incrementUserCounter } from "../services/firestoreUsers";
-import { requestResumeApi } from "../api/resumeApi";
+import {
+  requestGenerateStructuredResume,
+  requestParseBuilderResume,
+  markBuildDownload,
+} from "../api/resumeApi";
 import {
   MESSAGES,
   RESUME_FILE_ACCEPT,
@@ -14,698 +18,146 @@ import {
   isWithinResumeSizeLimit,
 } from "../utils/resumeFileValidation";
 
-const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
-
 const STEPS = [
-  "Personal Info",
+  "Contact",
+  "Summary",
+  "Skills",
   "Experience",
   "Education",
-  "Skills",
   "Projects",
+  "Certifications",
   "Export",
 ];
 
-const EMPTY = {
-  personal: {
-    name: "",
-    email: "",
-    phone: "",
-    location: "",
-    linkedin: "",
-    portfolio: "",
-    github: "",
-    headline: "",
-    summary: "",
-    photoUrl: "",
-  },
-  experience: [{ company: "", role: "", duration: "", bullets: ["", ""] }],
-  education: [{ institute: "", degree: "", year: "" }],
-  skills: { technical: "", tools: "", languages: "" },
-  projects: [{ name: "", link: "", desc: "" }],
+const EMPTY_STRUCTURED = {
+  name: "",
+  email: "",
+  phone: "",
+  linkedin: "",
+  github: "",
+  summary: "",
+  skills: [],
+  experience: [{ title: "", company: "", duration: "", description: "" }],
+  education: [{ degree: "", institution: "", year: "" }],
+  certifications: [""],
+  projects: [{ name: "", description: "", techStack: "" }],
 };
 
 const RESUME_TEMPLATES = [
-  {
-    id: "ats_clean",
-    name: "Classic Professional",
-    description: "Single column with blue accent section headings.",
-    useCase: "General professional applications.",
-    atsScore: 96,
-    photoIncluded: false,
-    primary: "#0f766e",
-    background: "#ffffff",
-    text: "#111827",
-    sectionBg: "#f8fafc",
-    sideBg: "#f0fdfa",
-    border: "#99f6e4",
-  },
-  {
-    id: "modern_split",
-    name: "Modern Sidebar",
-    description: "Two-column resume with dark sidebar for contact and skills.",
-    useCase: "Product, design, and full-stack roles.",
-    atsScore: 94,
-    photoIncluded: false,
-    primary: "#1d4ed8",
-    background: "#ffffff",
-    text: "#0f172a",
-    sectionBg: "#eff6ff",
-    sideBg: "#eff6ff",
-    border: "#bfdbfe",
-  },
-  {
-    id: "executive",
-    name: "With Photo - Executive",
-    description: "Executive-style layout with strong header and photo area.",
-    useCase: "Leadership and senior-level profiles.",
-    atsScore: 92,
-    photoIncluded: true,
-    primary: "#7c2d12",
-    background: "#fffdf7",
-    text: "#1f2937",
-    sectionBg: "#fffbeb",
-    sideBg: "#fff7ed",
-    border: "#fdba74",
-  },
-  {
-    id: "minimal_mono",
-    name: "Minimal Clean",
-    description: "Thin dividers, maximum whitespace, no color styling.",
-    useCase: "Clean ATS-friendly applications.",
-    atsScore: 97,
-    photoIncluded: false,
-    primary: "#1f2937",
-    background: "#ffffff",
-    text: "#111827",
-    sectionBg: "#f3f4f6",
-    sideBg: "#f9fafb",
-    border: "#d1d5db",
-  },
-  {
-    id: "impact_edge",
-    name: "Creative Accent",
-    description: "Single column with colorful left-border accents.",
-    useCase: "Marketing, content, and creative roles.",
-    atsScore: 91,
-    photoIncluded: false,
-    primary: "#be123c",
-    background: "#fffdfd",
-    text: "#1f2937",
-    sectionBg: "#fff1f2",
-    sideBg: "#ffe4e6",
-    border: "#fda4af",
-  },
-  {
-    id: "tech_blueprint",
-    name: "Tech / Developer",
-    description: "Monospace, terminal-inspired visual language for developers.",
-    useCase: "Software engineering and DevOps roles.",
-    atsScore: 95,
-    photoIncluded: false,
-    primary: "#0f766e",
-    background: "#f8fafc",
-    text: "#0f172a",
-    sectionBg: "#ecfeff",
-    sideBg: "#cffafe",
-    border: "#67e8f9",
-  },
+  { id: "ats_clean", name: "Classic Professional", description: "Single-column ATS-safe layout.", atsScore: 96, photoIncluded: false },
+  { id: "modern_split", name: "Modern Sidebar", description: "Two-column layout with focused sidebar.", atsScore: 94, photoIncluded: false },
+  { id: "executive", name: "Executive", description: "Leadership-focused layout.", atsScore: 92, photoIncluded: false },
+  { id: "minimal_mono", name: "Minimal Clean", description: "Whitespace-heavy and readable.", atsScore: 97, photoIncluded: false },
+  { id: "impact_edge", name: "Creative Accent", description: "Subtle accent styling.", atsScore: 91, photoIncluded: false },
+  { id: "tech_blueprint", name: "Tech Blueprint", description: "Engineering-focused section rhythm.", atsScore: 95, photoIncluded: false },
 ];
 
-const ONE_PAGE_LIMITS = {
-  summary: 320,
-  headline: 90,
-  experienceItems: 3,
-  bulletsPerExperience: 3,
-  bulletChars: 130,
-  educationItems: 2,
-  projects: 2,
-  projectDescChars: 155,
-  skills: 20,
+const TEMPLATE_THEME = {
+  ats_clean: { accent: "#0b5ed7", paper: "#ffffff", border: "#d1d5db", heading: "#0b5ed7", split: false },
+  modern_split: { accent: "#0b5ed7", paper: "#ffffff", border: "#d1d5db", heading: "#1d4ed8", split: true },
+  executive: { accent: "#8b4513", paper: "#fffdf8", border: "#e5d7c6", heading: "#8b4513", split: false },
+  minimal_mono: { accent: "#111827", paper: "#ffffff", border: "#d1d5db", heading: "#111827", split: false },
+  impact_edge: { accent: "#be123c", paper: "#ffffff", border: "#f3c2cf", heading: "#be123c", split: false },
+  tech_blueprint: { accent: "#0f766e", paper: "#f8fafc", border: "#99f6e4", heading: "#0f766e", split: false },
 };
 
-const SECTION_COMPARE_RULES = [
-  {
-    id: "contact",
-    label: "Contact Info",
-    tip: "Add email, phone, and profile links in the header.",
-    test: (text) =>
-      /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text) &&
-      (/(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/.test(text) ||
-        /(linkedin|github)/i.test(text)),
-  },
-  {
-    id: "summary",
-    label: "Summary / Objective",
-    tip: "Keep a short summary aligned to your target role.",
-    test: (text) => /\b(summary|professional summary|objective|profile|about)\b/i.test(text),
-  },
-  {
-    id: "experience",
-    label: "Experience",
-    tip: "Include role, company, dates, and impact bullets.",
-    test: (text) => /\b(experience|work experience|employment|professional experience)\b/i.test(text),
-  },
-  {
-    id: "education",
-    label: "Education",
-    tip: "Add degree, institute, and passing year.",
-    test: (text) => /\b(education|academic)\b/i.test(text),
-  },
-  {
-    id: "skills",
-    label: "Skills",
-    tip: "Add a dedicated skills section with role keywords.",
-    test: (text) => /\b(skills|technical skills|core skills|tech stack)\b/i.test(text),
-  },
-  {
-    id: "projects",
-    label: "Projects",
-    tip: "Show 1-3 relevant projects with measurable outcomes.",
-    test: (text) => /\b(projects|project experience|key projects)\b/i.test(text),
-  },
-  {
-    id: "certifications",
-    label: "Certifications",
-    tip: "Include certifications that support the role.",
-    test: (text) => /\b(certification|certifications|certificate|licenses?)\b/i.test(text),
-  },
-  {
-    id: "achievements",
-    label: "Achievements / Awards",
-    tip: "Add awards or achievements to strengthen credibility.",
-    test: (text) => /\b(achievement|achievements|award|awards|accomplishments?)\b/i.test(text),
-  },
-  {
-    id: "internships",
-    label: "Internships",
-    tip: "List internships when they are relevant to target jobs.",
-    test: (text) => /\b(internship|internships)\b/i.test(text),
-  },
-  {
-    id: "languages",
-    label: "Languages",
-    tip: "Mention spoken or professional languages if useful.",
-    test: (text) => /\b(languages?)\b/i.test(text),
-  },
-];
+function cleanValue(value) {
+  return String(value || "").trim();
+}
 
-function normalizeText(text) {
-  return (text || "")
+function cleanText(value) {
+  return String(value || "")
     .replace(/\r/g, "")
-    .replace(/\t/g, " ")
-    .replace(/[^\x20-\x7E\n]/g, " ")
     .replace(/[ ]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-function pickMatch(text, pattern) {
-  const match = text.match(pattern);
-  return match ? match[0] : "";
+function parseCsvToList(value = "") {
+  return String(value || "")
+    .split(",")
+    .map((item) => cleanValue(item))
+    .filter(Boolean);
+}
+
+function listToCsv(list = []) {
+  return Array.isArray(list) ? list.filter(Boolean).join(", ") : "";
+}
+
+function uniqueList(items = []) {
+  const seen = new Set();
+  const output = [];
+  items.forEach((item) => {
+    const value = cleanValue(item);
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    output.push(value);
+  });
+  return output;
+}
+
+function sanitizeStructuredData(data = {}) {
+  const safe = data && typeof data === "object" ? data : {};
+
+  const experience = Array.isArray(safe.experience)
+    ? safe.experience
+        .map((item) => ({
+          title: cleanValue(item?.title),
+          company: cleanValue(item?.company),
+          duration: cleanValue(item?.duration),
+          description: cleanText(item?.description),
+        }))
+        .filter((item) => item.title || item.company || item.duration || item.description)
+    : [];
+
+  const education = Array.isArray(safe.education)
+    ? safe.education
+        .map((item) => ({
+          degree: cleanValue(item?.degree),
+          institution: cleanValue(item?.institution),
+          year: cleanValue(item?.year),
+        }))
+        .filter((item) => item.degree || item.institution || item.year)
+    : [];
+
+  const projects = Array.isArray(safe.projects)
+    ? safe.projects
+        .map((item) => ({
+          name: cleanValue(item?.name),
+          description: cleanText(item?.description),
+          techStack: cleanValue(item?.techStack),
+        }))
+        .filter((item) => item.name || item.description || item.techStack)
+    : [];
+
+  const skills = uniqueList(Array.isArray(safe.skills) ? safe.skills : parseCsvToList(safe.skills));
+  const certifications = uniqueList(
+    Array.isArray(safe.certifications) ? safe.certifications : parseCsvToList(safe.certifications)
+  );
+
+  return {
+    name: cleanValue(safe.name),
+    email: cleanValue(safe.email),
+    phone: cleanValue(safe.phone),
+    linkedin: cleanValue(safe.linkedin),
+    github: cleanValue(safe.github),
+    summary: cleanText(safe.summary),
+    skills,
+    experience: experience.length ? experience : [{ title: "", company: "", duration: "", description: "" }],
+    education: education.length ? education : [{ degree: "", institution: "", year: "" }],
+    certifications: certifications.length ? certifications : [""],
+    projects: projects.length ? projects : [{ name: "", description: "", techStack: "" }],
+  };
 }
 
 function sanitizePdfName(name) {
-  const cleaned = (name || "")
+  const cleaned = String(name || "")
     .trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
     .replace(/\s+/g, "_")
     .slice(0, 80);
   return cleaned || "resume_ats_optimized";
-}
-
-function shortenText(value, maxLength) {
-  const normalized = String(value || "").replace(/[ ]{2,}/g, " ").trim();
-  if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
-}
-
-function parseSkillTokens(skills) {
-  return [skills.technical, skills.tools, skills.languages]
-    .filter(Boolean)
-    .join(",")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function hasInternshipEntries(experience = []) {
-  return experience.some((item) =>
-    /intern(ship)?/i.test(
-      [item.role, item.company, ...(item.bullets || [])]
-        .filter(Boolean)
-        .join(" ")
-    )
-  );
-}
-
-function compareResumeSections(originalText, generatedText) {
-  const source = String(originalText || "").trim();
-  if (!source) return null;
-
-  const candidate = String(generatedText || "");
-
-  const originalPresence = SECTION_COMPARE_RULES.map((rule) => ({
-    id: rule.id,
-    label: rule.label,
-    tip: rule.tip,
-    present: rule.test(source),
-  }));
-  const generatedPresence = SECTION_COMPARE_RULES.map((rule) => ({
-    id: rule.id,
-    label: rule.label,
-    tip: rule.tip,
-    present: rule.test(candidate),
-  }));
-
-  const generatedMap = new Map(generatedPresence.map((item) => [item.id, item]));
-  const originalSections = originalPresence.filter((item) => item.present);
-  const retainedSections = originalSections.filter((item) => generatedMap.get(item.id)?.present);
-  const missingSections = originalSections.filter((item) => !generatedMap.get(item.id)?.present);
-  const extraSections = generatedPresence.filter(
-    (item) => item.present && !originalSections.some((original) => original.id === item.id)
-  );
-
-  const coverage = originalSections.length
-    ? Math.round((retainedSections.length * 100) / originalSections.length)
-    : 100;
-
-  return {
-    originalSections,
-    retainedSections,
-    missingSections,
-    extraSections,
-    coverage,
-  };
-}
-
-function compactResumeForOnePage(data) {
-  let trimmed = false;
-  const markTrim = (condition) => {
-    if (condition) trimmed = true;
-  };
-
-  const source = data || EMPTY;
-  const skillTokens = parseSkillTokens(source.skills);
-  const trimmedSkills = skillTokens.slice(0, ONE_PAGE_LIMITS.skills);
-  markTrim(trimmedSkills.length < skillTokens.length);
-
-  const personal = {
-    ...source.personal,
-    headline: shortenText(source.personal.headline, ONE_PAGE_LIMITS.headline),
-    summary: shortenText(source.personal.summary, ONE_PAGE_LIMITS.summary),
-  };
-  markTrim(personal.headline !== (source.personal.headline || "").trim());
-  markTrim(personal.summary !== (source.personal.summary || "").trim());
-
-  const experienceInput = source.experience || [];
-  const experience = experienceInput
-    .filter((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean))
-    .slice(0, ONE_PAGE_LIMITS.experienceItems)
-    .map((item) => {
-      const bulletsInput = (item.bullets || []).filter(Boolean);
-      const bullets = bulletsInput
-        .slice(0, ONE_PAGE_LIMITS.bulletsPerExperience)
-        .map((bullet) => shortenText(bullet, ONE_PAGE_LIMITS.bulletChars));
-      markTrim(bullets.length < bulletsInput.length);
-      return {
-        ...item,
-        role: shortenText(item.role, 56),
-        company: shortenText(item.company, 56),
-        duration: shortenText(item.duration, 30),
-        bullets,
-      };
-    });
-  markTrim(experience.length < experienceInput.filter((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean)).length);
-
-  const educationInput = source.education || [];
-  const education = educationInput
-    .filter((item) => item.institute || item.degree || item.year)
-    .slice(0, ONE_PAGE_LIMITS.educationItems)
-    .map((item) => ({
-      ...item,
-      institute: shortenText(item.institute, 70),
-      degree: shortenText(item.degree, 56),
-      year: shortenText(item.year, 30),
-    }));
-  markTrim(education.length < educationInput.filter((item) => item.institute || item.degree || item.year).length);
-
-  const projectsInput = source.projects || [];
-  const projects = projectsInput
-    .filter((item) => item.name || item.link || item.desc)
-    .slice(0, ONE_PAGE_LIMITS.projects)
-    .map((item) => ({
-      ...item,
-      name: shortenText(item.name, 48),
-      link: shortenText(item.link, 58),
-      desc: shortenText(item.desc, ONE_PAGE_LIMITS.projectDescChars),
-    }));
-  markTrim(projects.length < projectsInput.filter((item) => item.name || item.link || item.desc).length);
-
-  return {
-    trimmed,
-    data: {
-      personal,
-      experience: experience.length ? experience : EMPTY.experience,
-      education: education.length ? education : EMPTY.education,
-      skills: {
-        technical: trimmedSkills.slice(0, 8).join(", "),
-        tools: trimmedSkills.slice(8, 14).join(", "),
-        languages: trimmedSkills.slice(14).join(", "),
-      },
-      projects: projects.length ? projects : EMPTY.projects,
-    },
-  };
-}
-
-const DATE_RANGE_PATTERN =
-  /((19|20)\d{2}\s*(?:-|to)\s*(?:present|(19|20)\d{2}))|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}\s*(?:-|to)\s*(?:present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}))/i;
-
-function splitIntoParagraphs(lines = []) {
-  const paragraphs = [];
-  let current = [];
-
-  lines.forEach((line) => {
-    const normalized = String(line || "").replace(/\s+/g, " ").trim();
-    if (!normalized) {
-      if (current.length) {
-        paragraphs.push(current);
-        current = [];
-      }
-      return;
-    }
-    current.push(normalized);
-  });
-
-  if (current.length) {
-    paragraphs.push(current);
-  }
-
-  return paragraphs;
-}
-
-function cleanBulletPrefix(line) {
-  return String(line || "").replace(/^[-*\u2022]\s*/, "").trim();
-}
-
-function extractDurationFromText(text) {
-  return pickMatch(text, DATE_RANGE_PATTERN);
-}
-
-function parseExperienceEntries(lines = []) {
-  const paragraphs = splitIntoParagraphs(lines);
-  const parsed = [];
-
-  paragraphs.forEach((paragraph) => {
-    const items = paragraph.map((line) => cleanBulletPrefix(line)).filter(Boolean);
-    if (!items.length) return;
-
-    const header = items[0] || "";
-    const duration = extractDurationFromText(items.join(" "));
-    let role = "";
-    let company = "";
-
-    if (header.includes("@")) {
-      const [left, right] = header.split("@").map((part) => part.trim());
-      role = left || "";
-      company = right?.split("|")?.[0]?.trim() || "";
-    } else if (header.includes("|")) {
-      const parts = header.split("|").map((part) => part.trim()).filter(Boolean);
-      role = parts[0] || "";
-      company = parts[1] || "";
-    } else {
-      const dashParts = header.split(/\s(?:-|\u2013)\s/).map((part) => part.trim()).filter(Boolean);
-      role = dashParts[0] || header;
-      company = dashParts[1] || "";
-    }
-
-    const bullets = items.slice(1).filter(Boolean);
-    if (role || company || duration || bullets.length) {
-      parsed.push({
-        company,
-        role: role || (duration ? "Experience" : ""),
-        duration,
-        bullets: bullets.length ? bullets : [""],
-      });
-    }
-  });
-
-  return parsed.length ? parsed : EMPTY.experience;
-}
-
-function parseEducationEntries(lines = []) {
-  const degreePattern =
-    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma|h\.?s|high school)[^,|]*/i;
-  const yearPattern = /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i;
-  const paragraphs = splitIntoParagraphs(lines);
-  const parsed = [];
-
-  paragraphs.forEach((paragraph) => {
-    const combined = paragraph.join(" | ");
-    const firstLine = paragraph[0] || "";
-    const parts = firstLine.split("|").map((part) => part.trim()).filter(Boolean);
-    const degree = pickMatch(combined, degreePattern);
-    const year = pickMatch(combined, yearPattern);
-
-    let institute = parts[0] || firstLine;
-    if (degree) {
-      institute = institute.replace(degree, "").trim();
-    }
-    if (year) {
-      institute = institute.replace(year, "").trim();
-    }
-    institute = institute.replace(/[,-]+$/g, "").trim();
-
-    const normalizedDegree = degree || parts[1] || "";
-    const normalizedYear = year || parts[2] || "";
-
-    if (institute || normalizedDegree || normalizedYear) {
-      parsed.push({
-        institute,
-        degree: normalizedDegree,
-        year: normalizedYear,
-      });
-    }
-  });
-
-  return parsed.length ? parsed : EMPTY.education;
-}
-
-function parseSkillEntries(skillLines = [], fallbackText = "") {
-  const splitTokens = (value) =>
-    String(value || "")
-      .replace(/^[-*\u2022]\s*/, "")
-      .split(/,|\||\/|;|\u2022/)
-      .map((token) => token.trim())
-      .filter((token) => token && token.length <= 48 && /[A-Za-z]/.test(token));
-
-  const uniqueByCase = (tokens) => {
-    const seen = new Set();
-    const output = [];
-    tokens.forEach((token) => {
-      const key = token.toLowerCase();
-      if (seen.has(key)) return;
-      seen.add(key);
-      output.push(token);
-    });
-    return output;
-  };
-
-  const categories = {
-    technical: [],
-    tools: [],
-    languages: [],
-  };
-
-  skillLines.forEach((line) => {
-    const normalized = String(line || "").trim();
-    if (!normalized) return;
-
-    if (/^languages?\s*:/i.test(normalized)) {
-      categories.languages.push(...splitTokens(normalized.replace(/^languages?\s*:/i, "")));
-      return;
-    }
-    if (/^(tools?|platforms?|frameworks?)\s*:/i.test(normalized)) {
-      categories.tools.push(...splitTokens(normalized.replace(/^(tools?|platforms?|frameworks?)\s*:/i, "")));
-      return;
-    }
-    if (/^(technical skills?|skills?)\s*:/i.test(normalized)) {
-      categories.technical.push(...splitTokens(normalized.replace(/^(technical skills?|skills?)\s*:/i, "")));
-      return;
-    }
-    categories.technical.push(...splitTokens(normalized));
-  });
-
-  if (!categories.technical.length && !categories.tools.length && !categories.languages.length) {
-    const fallbackTokens = uniqueByCase(splitTokens(fallbackText)).slice(0, 60);
-    categories.technical = fallbackTokens.slice(0, 28);
-    categories.tools = fallbackTokens.slice(28, 44);
-    categories.languages = fallbackTokens.slice(44);
-  }
-
-  return {
-    technical: uniqueByCase(categories.technical).join(", "),
-    tools: uniqueByCase(categories.tools).join(", "),
-    languages: uniqueByCase(categories.languages).join(", "),
-  };
-}
-
-function parseProjectEntries(lines = [], allUrls = []) {
-  const paragraphs = splitIntoParagraphs(lines);
-  const parsed = [];
-
-  paragraphs.forEach((paragraph) => {
-    const combined = paragraph.join(" ");
-    const paragraphUrls = Array.from(
-      new Set(
-        (combined.match(/(?:https?:\/\/|www\.)[^\s)]+/gi) || []).map((url) =>
-          url.replace(/[),.;]+$/g, "")
-        )
-      )
-    );
-    const link = paragraphUrls[0] || "";
-    const nonUrlLines = paragraph.filter((line) => !/(https?:\/\/|www\.)/i.test(line));
-    const name = (nonUrlLines[0] || "").trim();
-    const desc = nonUrlLines.slice(1).join(" ").trim();
-
-    if (name || link || desc) {
-      parsed.push({ name, link, desc });
-    }
-  });
-
-  if (!parsed.length && allUrls.length) {
-    const backupLink = allUrls.find((url) => !/linkedin\.com|github\.com/i.test(url)) || "";
-    if (backupLink) {
-      parsed.push({ name: "Project", link: backupLink, desc: "" });
-    }
-  }
-
-  return parsed.length ? parsed : EMPTY.projects;
-}
-
-function parseUploadedResumeText(rawText) {
-  const text = normalizeText(rawText);
-  const rawLines = text.split("\n").map((line) => line.replace(/\s+$/g, ""));
-  const lines = rawLines.map((line) => line.trim()).filter(Boolean);
-
-  const headingMatchers = {
-    summary: /^(summary|professional summary|objective|profile|about)\b/i,
-    experience: /^(experience|work experience|professional experience|internship|internships)\b/i,
-    education: /^(education|academic)\b/i,
-    skills: /^(skills|technical skills|core skills|tech stack)\b/i,
-    projects: /^(projects|project experience|key projects)\b/i,
-  };
-
-  const sections = {
-    header: [],
-    summary: [],
-    experience: [],
-    education: [],
-    skills: [],
-    projects: [],
-  };
-
-  let currentSection = "header";
-  rawLines.forEach((line) => {
-    const normalized = line.replace(/\s+/g, " ").trim();
-    const matchKey = Object.entries(headingMatchers).find(([, regex]) => regex.test(normalized))?.[0];
-    if (matchKey) {
-      currentSection = matchKey;
-      const inline = normalized.split(":").slice(1).join(":").trim();
-      if (inline.length > 2) {
-        sections[currentSection].push(inline);
-      }
-      return;
-    }
-    sections[currentSection].push(line);
-  });
-
-  const email = pickMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  const phone = pickMatch(
-    text,
-    /(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?\d{3,4}[\s-]?\d{3,4}/
-  );
-  const linkedin = pickMatch(text, /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s]+/i);
-  const github = pickMatch(text, /(?:https?:\/\/)?(?:www\.)?github\.com\/[^\s]+/i);
-
-  const allUrls = Array.from(
-    new Set(
-      (text.match(/(?:https?:\/\/|www\.)[^\s)]+/gi) || []).map((url) =>
-        url.replace(/[),.;]+$/g, "")
-      )
-    )
-  );
-  const portfolio =
-    allUrls.find(
-      (url) =>
-        !/linkedin\.com/i.test(url) &&
-        !/github\.com/i.test(url)
-    ) || "";
-
-  const maybeName =
-    lines.find(
-      (line) =>
-        /^[A-Za-z][A-Za-z .'-]{2,45}$/.test(line) &&
-        !/@/.test(line) &&
-        !/(summary|objective|education|skills|projects|experience|internship)/i.test(line)
-    ) || "";
-
-  const maybeHeadline =
-    sections.header
-      .map((line) => String(line || "").trim())
-      .find(
-        (line) =>
-          line.length >= 8 &&
-          line.length <= 80 &&
-          !/@/.test(line) &&
-          !/(linkedin|github|www\.|http)/i.test(line)
-      ) || "";
-
-  const maybeSummary = (
-    sections.summary.length
-      ? sections.summary.join(" ")
-      : lines.find((line) => line.length > 70 && line.length < 320) || ""
-  ).trim();
-
-  return {
-    personal: {
-      name: maybeName,
-      email,
-      phone,
-      location: "",
-      linkedin,
-      portfolio,
-      github,
-      headline: maybeHeadline,
-      summary: maybeSummary,
-      photoUrl: "",
-    },
-    experience: parseExperienceEntries(sections.experience),
-    education: parseEducationEntries(sections.education),
-    skills: parseSkillEntries(
-      sections.skills.map((line) => String(line || "").trim()).filter(Boolean),
-      sections.skills.length ? sections.skills.join(", ") : text
-    ),
-    projects: parseProjectEntries(sections.projects, allUrls),
-    rawText: text,
-    sectionCount: Object.values(sections).filter((value) => value.some((line) => String(line || "").trim())).length,
-  };
-}
-
-function mergeIntoBuilderData(parsed) {
-  return {
-    personal: { ...EMPTY.personal, ...(parsed.personal || {}) },
-    experience:
-      parsed.experience && parsed.experience.length
-        ? parsed.experience
-        : EMPTY.experience,
-    education:
-      parsed.education && parsed.education.length
-        ? parsed.education
-        : EMPTY.education,
-    skills: { ...EMPTY.skills, ...(parsed.skills || {}) },
-    projects:
-      parsed.projects && parsed.projects.length ? parsed.projects : EMPTY.projects,
-  };
 }
 
 async function exportNodeAsPdf(node, fileName) {
@@ -714,7 +166,7 @@ async function exportNodeAsPdf(node, fileName) {
   const canvas = await html2canvas(node, {
     scale: 2,
     useCORS: true,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f5f5f5",
   });
 
   const pdf = new jsPDF("p", "pt", "a4");
@@ -734,11 +186,10 @@ async function exportNodeAsPdf(node, fileName) {
     const sliceCanvas = document.createElement("canvas");
     sliceCanvas.width = canvas.width;
     sliceCanvas.height = sliceHeight;
-
     const context = sliceCanvas.getContext("2d");
     if (!context) break;
 
-    context.fillStyle = "#ffffff";
+    context.fillStyle = "#f5f5f5";
     context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
     context.drawImage(
       canvas,
@@ -753,10 +204,7 @@ async function exportNodeAsPdf(node, fileName) {
     );
 
     const pageImage = sliceCanvas.toDataURL("image/png");
-    if (pageIndex > 0) {
-      pdf.addPage("a4", "p");
-    }
-
+    if (pageIndex > 0) pdf.addPage("a4", "p");
     const renderHeight = sliceHeight * scaleRatio;
     pdf.addImage(pageImage, "PNG", margin, margin, printableWidth, renderHeight, undefined, "FAST");
 
@@ -767,841 +215,438 @@ async function exportNodeAsPdf(node, fileName) {
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
 
-/* STEP FORMS */
-function PersonalForm({ data, onChange }) {
-  const fields = [
-    ["name", "full_name", "text", "Suman Karmakar"],
-    ["email", "email_address", "email", "suman@email.com"],
-    ["phone", "phone_number", "text", "+91 98xxx xxxxx"],
-    ["location", "city, country", "text", "Kolkata, India"],
-    ["linkedin", "linkedin_url", "text", "linkedin.com/in/yourprofile"],
-    ["portfolio", "portfolio_url", "text", "yourportfolio.com"],
-    ["github", "github_url", "text", "github.com/SumanKarmakar467"],
-    ["headline", "professional_headline", "text", "Full Stack Developer | Java + React"],
-  ];
-
-  const handlePhotoUpload = (file) => {
-    if (!file) return;
-    if (!PHOTO_TYPES.includes(file.type)) {
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      onChange({ ...data, photoUrl: String(reader.result || "") });
-    };
-    reader.readAsDataURL(file);
-  };
-
+function SectionTitle({ label, color }) {
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
-        {fields.map(([key, label, type, placeholder]) => (
-          <div key={key} className="form-group">
-            <label className="form-label">{label}</label>
-            <input
-              className="form-input"
-              type={type}
-              placeholder={placeholder}
-              value={data[key]}
-              onChange={(e) => onChange({ ...data, [key]: e.target.value })}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">about_section</label>
-        <textarea
-          className="form-textarea"
-          rows={4}
-          placeholder="Write a concise about section with achievements and target role."
-          value={data.summary || ""}
-          onChange={(e) => onChange({ ...data, summary: e.target.value })}
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">profile_photo (optional)</label>
-        <input
-          className="form-input"
-          type="file"
-          accept=".png,.jpg,.jpeg,.webp"
-          onChange={(e) => handlePhotoUpload(e.target.files?.[0])}
-        />
-        {data.photoUrl ? (
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src={data.photoUrl}
-              alt="profile preview"
-              style={{
-                width: 56,
-                height: 56,
-                objectFit: "cover",
-                borderRadius: "50%",
-                border: "2px solid var(--border)",
-              }}
-            />
-            <button
-              className="btn-ghost"
-              onClick={() => onChange({ ...data, photoUrl: "" })}
-              style={{ fontSize: 11, padding: "6px 10px" }}
-            >
-              remove_photo()
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function ExperienceForm({ data, onChange }) {
-  const update = (i, field, val) => {
-    const updated = [...data];
-    updated[i] = { ...updated[i], [field]: val };
-    onChange(updated);
-  };
-  const updateBullet = (i, j, val) => {
-    const updated = [...data];
-    updated[i].bullets[j] = val;
-    onChange(updated);
-  };
-  const addBullet = (i) => {
-    const updated = [...data];
-    updated[i].bullets.push("");
-    onChange(updated);
-  };
-  const addExp = () =>
-    onChange([...data, { company: "", role: "", duration: "", bullets: [""] }]);
-
-  return (
-    <div>
-      {data.map((exp, i) => (
-        <div
-          key={i}
-          style={{
-            background: "var(--d3)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "1.25rem",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: "0.75rem",
-              marginBottom: "0.75rem",
-            }}
-          >
-            {[["role", "job_title"], ["company", "company_name"], ["duration", "duration"]].map(
-              ([field, label]) => (
-                <div key={field} className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">{label}</label>
-                  <input
-                    className="form-input"
-                    placeholder={
-                      field === "duration" ? "Jun 2023 - Present" : ""
-                    }
-                    value={exp[field]}
-                    onChange={(e) => update(i, field, e.target.value)}
-                  />
-                </div>
-              )
-            )}
-          </div>
-          <label className="form-label">impact_bullets (experience / internship)</label>
-          {exp.bullets.map((b, j) => (
-            <input
-              key={j}
-              className="form-input"
-              style={{ marginBottom: 8 }}
-              placeholder={`Bullet ${j + 1}: start with a verb (Built, Led, Increased...)`}
-              value={b}
-              onChange={(e) => updateBullet(i, j, e.target.value)}
-            />
-          ))}
-          <button
-            className="btn-ghost"
-            style={{ fontSize: 11, padding: "5px 12px", marginTop: 4 }}
-            onClick={() => addBullet(i)}
-          >
-            + add_bullet()
-          </button>
-        </div>
-      ))}
-      <button className="btn-ghost" onClick={addExp}>
-        + add_experience()
-      </button>
-    </div>
-  );
-}
-
-function EducationForm({ data, onChange }) {
-  const update = (i, field, val) => {
-    const updated = [...data];
-    updated[i] = { ...updated[i], [field]: val };
-    onChange(updated);
-  };
-  return (
-    <div>
-      {data.map((edu, i) => (
-        <div
-          key={i}
-          style={{
-            background: "var(--d3)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "1.25rem",
-            marginBottom: "1rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: "0.75rem",
-          }}
-        >
-          {[["institute", "institute_name"], ["degree", "degree / field"], ["year", "year"]].map(
-            ([field, label]) => (
-              <div key={field} className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{label}</label>
-                <input
-                  className="form-input"
-                  value={edu[field]}
-                  onChange={(e) => update(i, field, e.target.value)}
-                />
-              </div>
-            )
-          )}
-        </div>
-      ))}
-      <button
-        className="btn-ghost"
-        onClick={() =>
-          onChange([...data, { institute: "", degree: "", year: "" }])
-        }
-      >
-        + add_education()
-      </button>
-    </div>
-  );
-}
-
-function SkillsForm({ data, onChange }) {
-  return (
-    <div>
-      {[
-        ["technical", "technical_skills", "JavaScript, Node.js + Express, React, REST API, MongoDB"],
-        ["tools", "tools_&_platforms", "Git, Maven, Docker, Vercel, Postman"],
-        ["languages", "programming_languages", "Java, JavaScript, Python"],
-      ].map(([key, label, placeholder]) => (
-        <div key={key} className="form-group">
-          <label className="form-label">{label}</label>
-          <input
-            className="form-input"
-            placeholder={placeholder}
-            value={data[key]}
-            onChange={(e) => onChange({ ...data, [key]: e.target.value })}
-          />
-        </div>
-      ))}
-      <div
-        style={{
-          background: "rgba(0,229,255,0.05)",
-          border: "1px solid rgba(0,229,255,0.15)",
-          borderRadius: 8,
-          padding: "10px 14px",
-          fontFamily: "var(--font-mono)",
-          fontSize: 11,
-          color: "var(--muted)",
-          lineHeight: 1.8,
-        }}
-      >
-        tip: separate skills with commas. ATS reads comma-separated lists best.
-      </div>
-    </div>
-  );
-}
-
-function ProjectsForm({ data, onChange }) {
-  const update = (i, field, val) => {
-    const updated = [...data];
-    updated[i] = { ...updated[i], [field]: val };
-    onChange(updated);
-  };
-  return (
-    <div>
-      {data.map((p, i) => (
-        <div
-          key={i}
-          style={{
-            background: "var(--d3)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "1.25rem",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "0.75rem",
-              marginBottom: "0.75rem",
-            }}
-          >
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">project_name</label>
-              <input
-                className="form-input"
-                value={p.name}
-                onChange={(e) => update(i, "name", e.target.value)}
-              />
-            </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">github_or_live_url</label>
-              <input
-                className="form-input"
-                value={p.link}
-                onChange={(e) => update(i, "link", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">description</label>
-            <textarea
-              className="form-textarea"
-              rows={3}
-              placeholder="Describe what you built, the tech stack, and impact..."
-              value={p.desc}
-              onChange={(e) => update(i, "desc", e.target.value)}
-            />
-          </div>
-        </div>
-      ))}
-      <button
-        className="btn-ghost"
-        onClick={() => onChange([...data, { name: "", link: "", desc: "" }])}
-      >
-        + add_project()
-      </button>
-    </div>
-  );
-}
-
-function ExportStep({
-  onGenerate,
-  onTemplateConfirm,
-  onDownloadPdf,
-  loading,
-  error,
-  generatedResume,
-  pdfFileName,
-  onPdfFileNameChange,
-  jobDescription,
-  onJobDescriptionChange,
-  selectedTemplate,
-  onTemplateChange,
-  preserveOriginalData,
-  onPreserveOriginalDataChange,
-  onePageTrimmed,
-  sectionComparison,
-}) {
-  return (
-    <div>
-      <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-        Export ATS Resume
-      </h3>
-      <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: "1.2rem", lineHeight: 1.7 }}>
-        Generate an improved resume, set a custom PDF name, and download.
-      </p>
-
-      <div className="form-group">
-        <label className="form-label">choose_template</label>
-        <TemplateGallery
-          templates={RESUME_TEMPLATES}
-          selectedTemplate={selectedTemplate}
-          onSelect={onTemplateChange}
-          onConfirm={onTemplateConfirm}
-          loading={loading}
-        />
-        <label
-          style={{
-            marginTop: 8,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            color: "var(--text-primary)",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={preserveOriginalData}
-            onChange={(event) => onPreserveOriginalDataChange(event.target.checked)}
-          />
-          preserve_original_data (recommended)
-        </label>
-        <div
-          style={{
-            marginTop: 8,
-            background: "rgba(0,255,136,0.06)",
-            border: "1px solid rgba(0,255,136,0.18)",
-            borderRadius: 8,
-            padding: "8px 10px",
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--g)",
-          }}
-        >
-          export_mode: auto-multi-page (no content clipping)
-        </div>
-        {!preserveOriginalData && onePageTrimmed ? (
-          <div
-            style={{
-              marginTop: 8,
-              background: "rgba(245,158,11,0.08)",
-              border: "1px solid rgba(245,158,11,0.25)",
-              borderRadius: 8,
-              padding: "8px 10px",
-              fontFamily: "var(--font-mono)",
-              fontSize: 10.5,
-              color: "var(--warning-text)",
-            }}
-          >
-            note: compact mode removed some long content to fit faster one-page layout.
-          </div>
-        ) : null}
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">job_description_for_optimization (optional)</label>
-        <textarea
-          className="form-textarea"
-          rows={4}
-          placeholder="Paste target role description to improve keyword matching."
-          value={jobDescription}
-          onChange={(e) => onJobDescriptionChange(e.target.value)}
-        />
-      </div>
-
-      <div className="form-group">
-        <label className="form-label">custom_pdf_name</label>
-        <input
-          className="form-input"
-          value={pdfFileName}
-          onChange={(e) => onPdfFileNameChange(e.target.value)}
-          placeholder="resume_ats_optimized"
-        />
-      </div>
-
-      {sectionComparison ? (
-        <div className="form-group">
-          <label className="form-label">section_comparison_with_original_resume</label>
-          <div
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              background: "var(--d3)",
-              padding: "10px 12px",
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--text-primary)",
-                marginBottom: 8,
-              }}
-            >
-              coverage_from_original: {sectionComparison.coverage}% ({sectionComparison.retainedSections.length}/
-              {sectionComparison.originalSections.length})
-            </div>
-
-            {sectionComparison.missingSections.length ? (
-              <div style={{ marginBottom: 8 }}>
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10.5,
-                    color: "var(--warning-text)",
-                    marginBottom: 6,
-                  }}
-                >
-                  missing_in_generated:
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {sectionComparison.missingSections.map((item) => (
-                    <span
-                      key={item.id}
-                      style={{
-                        border: "1px solid rgba(245,158,11,0.35)",
-                        background: "rgba(245,158,11,0.12)",
-                        color: "var(--warning-text)",
-                        borderRadius: 999,
-                        padding: "3px 9px",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                      }}
-                      title={item.tip}
-                    >
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10.5,
-                  color: "var(--g)",
-                  marginBottom: 8,
-                }}
-              >
-                missing_in_generated: none
-              </div>
-            )}
-
-            {sectionComparison.extraSections.length ? (
-              <div>
-                <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10.5,
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  added_in_generated:
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {sectionComparison.extraSections.map((item) => (
-                    <span
-                      key={item.id}
-                      style={{
-                        border: "1px solid rgba(0,255,136,0.28)",
-                        background: "rgba(0,255,136,0.1)",
-                        color: "var(--g)",
-                        borderRadius: 999,
-                        padding: "3px 9px",
-                        fontSize: 11,
-                        fontFamily: "var(--font-mono)",
-                      }}
-                    >
-                      {item.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {error && (
-        <div
-          style={{
-            background: "rgba(255,85,85,0.08)",
-            border: "1px solid rgba(255,85,85,0.25)",
-            borderRadius: 8,
-            padding: "10px 14px",
-            fontFamily: "var(--font-mono)",
-            fontSize: 12,
-            color: "var(--r)",
-            marginBottom: "1rem",
-            textAlign: "left",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {generatedResume ? (
-        <div>
-          <div
-            style={{
-              background: "rgba(0,255,136,0.06)",
-              border: "1px solid rgba(0,255,136,0.2)",
-              borderRadius: 10,
-              padding: "0.8rem",
-              marginBottom: "1rem",
-              overflow: "hidden",
-            }}
-          >
-            <pre
-              style={{
-                border: "1px solid rgba(0,255,136,0.2)",
-                width: "100%",
-                maxHeight: 300,
-                borderRadius: 8,
-                background: "#fff",
-                margin: 0,
-                padding: "0.75rem",
-                overflow: "auto",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11.5,
-                color: "#111827",
-                lineHeight: 1.65,
-              }}
-            >
-              {generatedResume}
-            </pre>
-          </div>
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf} disabled={loading}>
-              {loading ? "processing..." : "download_pdf()"}
-            </button>
-            <button className="btn-secondary" style={{ fontSize: 14 }} onClick={onGenerate} disabled={loading}>
-              regenerate_with_selected_template()
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-function LivePreview({ formData, selectedTemplate }) {
-  const { personal, experience, education, skills, projects } = formData;
-  const template = RESUME_TEMPLATES.find((item) => item.id === selectedTemplate) || RESUME_TEMPLATES[0];
-  const allSkills = parseSkillTokens(skills);
-  const hasExperienceContent = experience.some((item) => item.role || item.company || item.duration || item.bullets?.some(Boolean));
-  const hasInternship = hasInternshipEntries(experience);
-  const experienceTitle = hasInternship ? "Internship" : "Experience";
-  const hasProjectsContent = !hasInternship && projects.some((item) => item.name || item.link || item.desc);
-
-  const pageShell = {
-    background: template.background,
-    color: template.text,
-    fontSize: 10.6,
-    lineHeight: 1.52,
-    borderRadius: 8,
-    border: `1px solid ${template.border}`,
-    width: "100%",
-    minHeight: 940,
-    boxShadow: "0 8px 18px rgba(2, 6, 23, 0.08)",
-    overflowWrap: "anywhere",
-    wordBreak: "break-word",
-  };
-
-  const sectionTitle = (label) => (
     <div
       style={{
-        fontSize: 10.2,
+        marginTop: 12,
+        marginBottom: 6,
+        fontSize: 11,
         fontWeight: 800,
+        letterSpacing: 0.6,
         textTransform: "uppercase",
-        letterSpacing: 0.7,
-        color: template.primary,
-        borderBottom: `1.5px solid ${template.primary}`,
+        color,
+        borderBottom: `1px solid ${color}`,
         paddingBottom: 2,
-        margin: "10px 0 6px",
       }}
     >
       {label}
     </div>
   );
+}
 
-  if (template.id === "modern_split") {
+function ResumeTemplateBase({ theme, data }) {
+  const safe = sanitizeStructuredData(data);
+
+  if (theme.split) {
     return (
-      <div style={pageShell}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr" }}>
-          <div style={{ background: template.sideBg, padding: "16px 12px" }}>
-            {personal.photoUrl ? (
-              <img
-                src={personal.photoUrl}
-                alt="profile"
-                style={{ width: 74, height: 74, objectFit: "cover", borderRadius: "50%", marginBottom: 10 }}
-              />
-            ) : null}
-            <div style={{ fontSize: 9.5, color: template.primary, marginBottom: 4, fontWeight: 800 }}>CONTACT</div>
-            <div style={{ fontSize: 9.2 }}>{personal.email}</div>
-            <div style={{ fontSize: 9.2 }}>{personal.phone}</div>
-            <div style={{ fontSize: 9.2 }}>{personal.location}</div>
-            <div style={{ fontSize: 9.2 }}>{personal.linkedin}</div>
-            <div style={{ fontSize: 9.2 }}>{personal.portfolio}</div>
-            <div style={{ fontSize: 9.2 }}>{personal.github}</div>
+      <div
+        style={{
+          background: theme.paper,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 8,
+          color: "#1a1a1a",
+          fontSize: 11,
+          lineHeight: 1.6,
+          padding: 14,
+          minHeight: 860,
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "0.33fr 0.67fr", minHeight: 830 }}>
+          <div
+            style={{
+              background: "#1e293b",
+              color: "#ffffff",
+              borderRadius: 6,
+              padding: 12,
+              marginRight: 10,
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>{safe.name || "Your Name"}</div>
+            <div style={{ fontSize: 10, marginTop: 8 }}>{safe.email || "email@example.com"}</div>
+            <div style={{ fontSize: 10 }}>{safe.phone || "+00 0000 0000"}</div>
+            {safe.linkedin ? <div style={{ fontSize: 10, marginTop: 4 }}>{safe.linkedin}</div> : null}
+            {safe.github ? <div style={{ fontSize: 10 }}>{safe.github}</div> : null}
 
-            {sectionTitle("Skills")}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {allSkills.map((item) => (
-                <span
-                  key={item}
-                  style={{
-                    fontSize: 8.8,
-                    background: template.sectionBg,
-                    color: template.primary,
-                    borderRadius: 12,
-                    padding: "2px 7px",
-                    border: `1px solid ${template.primary}4D`,
-                  }}
-                >
-                  {item}
-                </span>
-              ))}
+            <SectionTitle label="Skills" color="#ffffff" />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {safe.skills.length
+                ? safe.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.45)",
+                        borderRadius: 999,
+                        fontSize: 9,
+                        padding: "2px 8px",
+                        color: "#ffffff",
+                        background: "rgba(255,255,255,0.12)",
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  ))
+                : <span style={{ fontSize: 9, color: "rgba(255,255,255,0.85)" }}>No skills added</span>}
             </div>
           </div>
 
-          <div style={{ padding: "16px 14px" }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: template.primary, lineHeight: 1.08 }}>
-              {personal.name || "Your Name"}
-            </div>
-            {personal.headline ? (
-              <div style={{ fontSize: 10.8, marginTop: 3, color: template.text, fontWeight: 700 }}>{personal.headline}</div>
-            ) : null}
-            {personal.summary ? (
-              <>
-                {sectionTitle("About")}
-                <div style={{ marginTop: 4, fontSize: 9.6, color: "#334155" }}>{personal.summary}</div>
-              </>
-            ) : null}
+          <div style={{ padding: "0 2px" }}>
+            <SectionTitle label="Professional Summary" color={theme.heading} />
+            <div>{safe.summary || "Add a concise summary for your profile."}</div>
 
-            {hasExperienceContent ? sectionTitle(experienceTitle) : null}
-            {hasExperienceContent
-              ? experience.map((item, i) => (
-                  <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
-                    <div style={{ fontWeight: 700, fontSize: 10.2 }}>{item.role || "Role"}</div>
-                    <div style={{ fontSize: 9.3, color: "#475569" }}>
-                      {[item.company, item.duration].filter(Boolean).join(" | ")}
-                    </div>
-                    {item.bullets.filter(Boolean).map((bullet, idx) => (
-                      <div key={`b-${idx}`} style={{ fontSize: 9.2, color: "#334155", marginTop: 2.5 }}>
-                        - {bullet}
-                      </div>
-                    ))}
-                  </div>
-                ))
-              : null}
-
-            {sectionTitle("Education")}
-            {education.map((item, i) => (
-              <div key={`edu-${i}`} style={{ fontSize: 9.4, marginBottom: 4 }}>
-                <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
+            <SectionTitle label="Work Experience" color={theme.heading} />
+            {safe.experience.map((item, index) => (
+              <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
+                <div style={{ fontWeight: 700 }}>{item.title || "Role"}</div>
+                <div style={{ color: "#334155", fontSize: 10.5 }}>
+                  {[item.company, item.duration].filter(Boolean).join(" | ")}
+                </div>
+                <div style={{ whiteSpace: "pre-wrap" }}>{item.description || "No description provided."}</div>
               </div>
             ))}
 
-            {hasProjectsContent ? sectionTitle("Projects") : null}
-            {hasProjectsContent
-              ? projects.map((item, i) => (
-                  <div key={`project-${i}`} style={{ marginBottom: 5 }}>
-                    <div style={{ fontWeight: 700, fontSize: 9.4 }}>
-                      {[item.name, item.link].filter(Boolean).join(" | ")}
-                    </div>
-                    <div style={{ fontSize: 9.1, color: "#374151" }}>{item.desc}</div>
-                  </div>
-                ))
+            <SectionTitle label="Education" color={theme.heading} />
+            {safe.education.map((item, index) => (
+              <div key={`${item.degree}-${index}`} style={{ marginBottom: 5 }}>
+                <strong>{item.degree || "Degree"}</strong> {[item.institution, item.year].filter(Boolean).join(" | ")}
+              </div>
+            ))}
+
+            {safe.projects.some((item) => item.name || item.description || item.techStack)
+              ? <SectionTitle label="Projects" color={theme.heading} />
               : null}
+            {safe.projects.map((item, index) => (
+              <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
+                <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
+                {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>Tech: {item.techStack}</div> : null}
+                <div>{item.description || "No description provided."}</div>
+              </div>
+            ))}
+
+            {safe.certifications.some(Boolean) ? <SectionTitle label="Certifications" color={theme.heading} /> : null}
+            {safe.certifications.filter(Boolean).map((item, index) => (
+              <div key={`${item}-${index}`}>- {item}</div>
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  const compactHeader = template.id === "minimal_mono" || template.id === "tech_blueprint";
-
   return (
-    <div style={{ ...pageShell, padding: compactHeader ? "0.95rem 1rem" : "1.15rem 1.1rem" }}>
-      {template.id === "impact_edge" ? (
-        <div
-          style={{
-            height: 6,
-            borderRadius: 999,
-            background: `linear-gradient(90deg, ${template.primary}, #fb7185)`,
-            marginBottom: 8,
-          }}
-        />
-      ) : null}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 11, borderBottom: `2px solid ${template.primary}`, paddingBottom: 8 }}>
-        {personal.photoUrl ? (
-          <img
-            src={personal.photoUrl}
-            alt="profile"
-            style={{ width: compactHeader ? 58 : 64, height: compactHeader ? 58 : 64, borderRadius: "50%", objectFit: "cover", border: `2px solid ${template.primary}` }}
-          />
-        ) : null}
-        <div>
-          <div style={{ fontSize: compactHeader ? 20 : 22, fontWeight: 800, color: template.primary, lineHeight: 1.1 }}>
-            {personal.name || "Your Name"}
-          </div>
-          {personal.headline ? <div style={{ fontSize: 10.6, fontWeight: 700 }}>{personal.headline}</div> : null}
-          <div style={{ fontSize: 9.1, marginTop: 3, color: "#4b5563" }}>
-            {[personal.email, personal.phone, personal.location, personal.linkedin, personal.portfolio, personal.github]
-              .filter(Boolean)
-              .join(" | ")}
-          </div>
+    <div
+      style={{
+        background: theme.paper,
+        border: `1px solid ${theme.border}`,
+        borderRadius: 8,
+        color: "#1a1a1a",
+        fontSize: 11,
+        lineHeight: 1.6,
+        padding: 14,
+        minHeight: 860,
+      }}
+    >
+      <div style={{ borderBottom: `2px solid ${theme.accent}`, paddingBottom: 8 }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: theme.heading }}>{safe.name || "Your Name"}</div>
+        <div style={{ fontSize: 10.5, color: "#334155", marginTop: 4 }}>
+          {[safe.email, safe.phone, safe.linkedin, safe.github].filter(Boolean).join(" | ")}
         </div>
       </div>
 
-      {personal.summary ? (
-        <>
-          {sectionTitle("About")}
-          <div style={{ marginTop: 8, background: template.sectionBg, borderRadius: 7, padding: "8px 10px", color: "#374151", fontSize: 9.5 }}>
-            {personal.summary}
+      <SectionTitle label="Professional Summary" color={theme.heading} />
+      <div>{safe.summary || "Add a concise summary for your profile."}</div>
+
+      <SectionTitle label="Skills" color={theme.heading} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {safe.skills.length
+          ? safe.skills.map((skill) => (
+              <span
+                key={skill}
+                style={{
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 999,
+                  background: "#f8fafc",
+                  color: "#1a1a1a",
+                  fontSize: 10,
+                  padding: "2px 9px",
+                }}
+              >
+                {skill}
+              </span>
+            ))
+          : <span style={{ color: "#64748b", fontSize: 10.5 }}>No skills added</span>}
+      </div>
+
+      <SectionTitle label="Work Experience" color={theme.heading} />
+      {safe.experience.map((item, index) => (
+        <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, color: "#1a1a1a" }}>{item.title || "Role"}</div>
+          <div style={{ fontSize: 10.5, color: "#334155" }}>
+            {[item.company, item.duration].filter(Boolean).join(" | ")}
           </div>
-        </>
-      ) : null}
-
-      {hasExperienceContent ? sectionTitle(experienceTitle) : null}
-      {hasExperienceContent
-        ? experience.map((item, i) => (
-            <div key={`exp-${i}`} style={{ marginBottom: 7 }}>
-              <div style={{ fontWeight: 700, fontSize: 10.1 }}>{item.role || "Role"}</div>
-              <div style={{ fontSize: 9.1, color: "#4b5563" }}>
-                {[item.company, item.duration].filter(Boolean).join(" | ")}
-              </div>
-              {item.bullets.filter(Boolean).map((bullet, idx) => (
-                <div key={`bullet-${idx}`} style={{ fontSize: 9.2, color: "#374151", marginTop: 2.5 }}>
-                  - {bullet}
-                </div>
-              ))}
-            </div>
-          ))
-        : null}
-
-      {sectionTitle("Education")}
-      {education.map((item, i) => (
-        <div key={`edu-${i}`} style={{ marginBottom: 4, fontSize: 9.2 }}>
-          <strong>{item.institute}</strong> {[item.degree, item.year].filter(Boolean).join(" | ")}
+          <div style={{ whiteSpace: "pre-wrap", color: "#1f2937" }}>{item.description || "No description provided."}</div>
         </div>
       ))}
 
-      {allSkills.length ? sectionTitle("Skills") : null}
-      {allSkills.length ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {allSkills.map((item) => (
-            <span
-              key={item}
-              style={{
-                fontSize: 8.8,
-                background: template.sectionBg,
-                border: `1px solid ${template.primary}55`,
-                color: template.primary,
-                padding: "1.5px 7px",
-                borderRadius: 12,
-              }}
-            >
-              {item}
-            </span>
-          ))}
+      <SectionTitle label="Education" color={theme.heading} />
+      {safe.education.map((item, index) => (
+        <div key={`${item.degree}-${index}`} style={{ marginBottom: 5, color: "#1f2937" }}>
+          <strong>{item.degree || "Degree"}</strong> {[item.institution, item.year].filter(Boolean).join(" | ")}
         </div>
-      ) : null}
+      ))}
 
-      {hasProjectsContent ? sectionTitle("Projects") : null}
-      {hasProjectsContent
-        ? projects.map((item, i) => (
-            <div key={`project-${i}`} style={{ marginBottom: 5.5 }}>
-              <div style={{ fontWeight: 700, fontSize: 9.3 }}>{[item.name, item.link].filter(Boolean).join(" | ")}</div>
-              <div style={{ fontSize: 8.95, color: "#374151" }}>{item.desc}</div>
-            </div>
-          ))
+      {safe.projects.some((item) => item.name || item.description || item.techStack)
+        ? <SectionTitle label="Projects" color={theme.heading} />
         : null}
+      {safe.projects.map((item, index) => (
+        <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
+          <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
+          {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>Tech: {item.techStack}</div> : null}
+          <div style={{ color: "#1f2937" }}>{item.description || "No description provided."}</div>
+        </div>
+      ))}
+
+      {safe.certifications.some(Boolean) ? <SectionTitle label="Certifications" color={theme.heading} /> : null}
+      {safe.certifications.filter(Boolean).map((item, index) => (
+        <div key={`${item}-${index}`} style={{ color: "#1f2937" }}>
+          - {item}
+        </div>
+      ))}
     </div>
   );
 }
-/* MAIN COMPONENT */
+
+function AtsCleanTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.ats_clean} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+function ModernSplitTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.modern_split} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+function ExecutiveTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.executive} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+function MinimalMonoTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.minimal_mono} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+function ImpactEdgeTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.impact_edge} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+function TechBlueprintTemplate({ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }) {
+  return <ResumeTemplateBase theme={TEMPLATE_THEME.tech_blueprint} data={{ name, email, phone, summary, skills, experience, education, projects, certifications, linkedin, github }} />;
+}
+
+const TEMPLATE_COMPONENTS = {
+  ats_clean: AtsCleanTemplate,
+  modern_split: ModernSplitTemplate,
+  executive: ExecutiveTemplate,
+  minimal_mono: MinimalMonoTemplate,
+  impact_edge: ImpactEdgeTemplate,
+  tech_blueprint: TechBlueprintTemplate,
+};
+
+function LivePreview({ structuredData, selectedTemplate }) {
+  const safe = sanitizeStructuredData(structuredData);
+  const Template = TEMPLATE_COMPONENTS[selectedTemplate] || AtsCleanTemplate;
+  return (
+    <div style={{ background: "#f5f5f5", border: "1px solid #d1d5db", borderRadius: 10, padding: 12, color: "#1a1a1a" }}>
+      <Template {...safe} />
+    </div>
+  );
+}
+
+function TextInput({ label, value, onChange, placeholder, type = "text" }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <input
+        className="form-input"
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder || ""}
+      />
+    </div>
+  );
+}
+
+function ContactStep({ data, onChange }) {
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        <TextInput label="name" value={data.name} onChange={(value) => onChange({ ...data, name: value })} />
+        <TextInput label="email" type="email" value={data.email} onChange={(value) => onChange({ ...data, email: value })} />
+        <TextInput label="phone" value={data.phone} onChange={(value) => onChange({ ...data, phone: value })} />
+        <TextInput label="linkedin" value={data.linkedin} onChange={(value) => onChange({ ...data, linkedin: value })} />
+        <TextInput label="github" value={data.github} onChange={(value) => onChange({ ...data, github: value })} />
+      </div>
+    </div>
+  );
+}
+
+function SummaryStep({ summary, onChange }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">professional_summary</label>
+      <textarea
+        className="form-textarea"
+        rows={6}
+        value={summary}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="Write a concise professional summary aligned to your target role."
+      />
+    </div>
+  );
+}
+
+function SkillsStep({ skills, onChange }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">skills (comma separated)</label>
+      <textarea
+        className="form-textarea"
+        rows={5}
+        value={listToCsv(skills)}
+        onChange={(event) => onChange(uniqueList(parseCsvToList(event.target.value)))}
+        placeholder="React, Node.js, Spring Boot, SQL, Docker"
+      />
+    </div>
+  );
+}
+
+function ExperienceStep({ experience, onChange }) {
+  const updateEntry = (index, patch) => {
+    const updated = [...experience];
+    updated[index] = { ...updated[index], ...patch };
+    onChange(updated);
+  };
+  const addEntry = () => onChange([...experience, { title: "", company: "", duration: "", description: "" }]);
+  const removeEntry = (index) => onChange(experience.filter((_, itemIndex) => itemIndex !== index));
+
+  return (
+    <div>
+      {experience.map((item, index) => (
+        <div key={`experience-${index}`} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 12, background: "var(--d3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+            <TextInput label="job_title" value={item.title} onChange={(value) => updateEntry(index, { title: value })} />
+            <TextInput label="company" value={item.company} onChange={(value) => updateEntry(index, { company: value })} />
+            <TextInput label="duration" value={item.duration} onChange={(value) => updateEntry(index, { duration: value })} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">description / responsibilities</label>
+            <textarea
+              className="form-textarea"
+              rows={4}
+              value={item.description}
+              onChange={(event) => updateEntry(index, { description: event.target.value })}
+              placeholder="- Built feature...&#10;- Improved process..."
+            />
+          </div>
+          <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={experience.length <= 1}>
+            remove_experience()
+          </button>
+        </div>
+      ))}
+      <button className="btn-ghost" onClick={addEntry}>+ add_experience()</button>
+    </div>
+  );
+}
+
+function EducationStep({ education, onChange }) {
+  const updateEntry = (index, patch) => {
+    const updated = [...education];
+    updated[index] = { ...updated[index], ...patch };
+    onChange(updated);
+  };
+  const addEntry = () => onChange([...education, { degree: "", institution: "", year: "" }]);
+  const removeEntry = (index) => onChange(education.filter((_, itemIndex) => itemIndex !== index));
+
+  return (
+    <div>
+      {education.map((item, index) => (
+        <div key={`education-${index}`} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 12, background: "var(--d3)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+            <TextInput label="degree" value={item.degree} onChange={(value) => updateEntry(index, { degree: value })} />
+            <TextInput label="institution" value={item.institution} onChange={(value) => updateEntry(index, { institution: value })} />
+            <TextInput label="year" value={item.year} onChange={(value) => updateEntry(index, { year: value })} />
+          </div>
+          <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={education.length <= 1}>
+            remove_education()
+          </button>
+        </div>
+      ))}
+      <button className="btn-ghost" onClick={addEntry}>+ add_education()</button>
+    </div>
+  );
+}
+
+function ProjectsStep({ projects, onChange }) {
+  const updateEntry = (index, patch) => {
+    const updated = [...projects];
+    updated[index] = { ...updated[index], ...patch };
+    onChange(updated);
+  };
+  const addEntry = () => onChange([...projects, { name: "", description: "", techStack: "" }]);
+  const removeEntry = (index) => onChange(projects.filter((_, itemIndex) => itemIndex !== index));
+
+  return (
+    <div>
+      {projects.map((item, index) => (
+        <div key={`project-${index}`} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 12, background: "var(--d3)" }}>
+          <TextInput label="project_name" value={item.name} onChange={(value) => updateEntry(index, { name: value })} />
+          <TextInput label="tech_stack" value={item.techStack} onChange={(value) => updateEntry(index, { techStack: value })} />
+          <div className="form-group">
+            <label className="form-label">project_description</label>
+            <textarea
+              className="form-textarea"
+              rows={4}
+              value={item.description}
+              onChange={(event) => updateEntry(index, { description: event.target.value })}
+            />
+          </div>
+          <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={projects.length <= 1}>
+            remove_project()
+          </button>
+        </div>
+      ))}
+      <button className="btn-ghost" onClick={addEntry}>+ add_project()</button>
+    </div>
+  );
+}
+
+function CertificationsStep({ certifications, onChange }) {
+  const updateEntry = (index, value) => {
+    const updated = [...certifications];
+    updated[index] = value;
+    onChange(updated);
+  };
+  const addEntry = () => onChange([...certifications, ""]);
+  const removeEntry = (index) => onChange(certifications.filter((_, itemIndex) => itemIndex !== index));
+
+  return (
+    <div>
+      {certifications.map((item, index) => (
+        <div key={`cert-${index}`} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <input
+            className="form-input"
+            value={item}
+            onChange={(event) => updateEntry(index, event.target.value)}
+            placeholder="AWS Certified Developer"
+          />
+          <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={certifications.length <= 1}>
+            remove
+          </button>
+        </div>
+      ))}
+      <button className="btn-ghost" onClick={addEntry}>+ add_certification()</button>
+    </div>
+  );
+}
+
 export default function ResumeBuilder({
   navigate,
   user,
@@ -1611,170 +656,29 @@ export default function ResumeBuilder({
   onLogout,
 }) {
   const [step, setStep] = useState(0);
-  const [formData, setFormData] = useState(EMPTY);
-  const [loading, setLoading] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [formData, setFormData] = useState(EMPTY_STRUCTURED);
+  const [generatedStructured, setGeneratedStructured] = useState(null);
   const [generatedResume, setGeneratedResume] = useState("");
-  const [sourceResumeText, setSourceResumeText] = useState("");
-  const [existingFile, setExistingFile] = useState(null);
-  const [importMessage, setImportMessage] = useState("");
+  const [buildId, setBuildId] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState("ats_clean");
   const [jobDescription, setJobDescription] = useState("");
   const [pdfFileName, setPdfFileName] = useState("resume_ats_optimized");
-  const [selectedTemplate, setSelectedTemplate] = useState("ats_clean");
-  const [preserveOriginalData, setPreserveOriginalData] = useState(true);
+  const [sourceResumeText, setSourceResumeText] = useState("");
+  const [existingFile, setExistingFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [templateMessage, setTemplateMessage] = useState("");
+  const [error, setError] = useState("");
+  const [importMessage, setImportMessage] = useState("");
+
   const previewRef = useRef(null);
-  const resumePreview = useMemo(
-    () => (preserveOriginalData ? { trimmed: false, data: formData } : compactResumeForOnePage(formData)),
-    [formData, preserveOriginalData]
+
+  const previewData = useMemo(
+    () => sanitizeStructuredData(generatedStructured || formData),
+    [generatedStructured, formData]
   );
 
-  const buildResumeText = (d) => {
-    const lines = [];
-    const p = d.personal;
-    const hasInternship = hasInternshipEntries(d.experience);
-    const showProjects = !hasInternship && d.projects.some((item) => item.name || item.link || item.desc);
-    lines.push(p.name || "Your Name");
-    if (p.headline) lines.push(p.headline);
-    lines.push([p.email, p.phone, p.location, p.linkedin, p.portfolio, p.github].filter(Boolean).join(" | "));
-    lines.push("");
-    if (p.summary) {
-      lines.push("ABOUT");
-      lines.push("-----");
-      lines.push(p.summary);
-      lines.push("");
-    }
-
-    if (d.experience.some((e) => e.role || e.company || e.bullets?.some(Boolean))) {
-      lines.push(hasInternship ? "INTERNSHIP" : "EXPERIENCE");
-      lines.push(hasInternship ? "----------" : "----------");
-      d.experience.forEach((e) => {
-        const header = [e.role, e.company].filter(Boolean).join(" @ ");
-        lines.push([header, e.duration].filter(Boolean).join(" | "));
-        e.bullets.filter(Boolean).forEach((b) => lines.push(`- ${b}`));
-        lines.push("");
-      });
-    }
-
-    if (d.education.some((e) => e.institute || e.degree || e.year)) {
-      lines.push("EDUCATION");
-      lines.push("---------");
-      d.education.forEach((e) => lines.push([e.institute, e.degree, e.year].filter(Boolean).join(" | ")));
-      lines.push("");
-    }
-
-    const skills = [d.skills.technical, d.skills.tools, d.skills.languages]
-      .filter(Boolean)
-      .join(", ");
-    if (skills) {
-      lines.push("SKILLS");
-      lines.push("------");
-      lines.push(skills);
-      lines.push("");
-    }
-
-    if (showProjects) {
-      lines.push("PROJECTS");
-      lines.push("--------");
-      d.projects.forEach((p) => {
-        lines.push([p.name, p.link].filter(Boolean).join(" | "));
-        if (p.desc) lines.push(p.desc);
-        lines.push("");
-      });
-    }
-
-    return lines.join("\n").trim();
-  };
-
-  const comparisonGeneratedText =
-    generatedResume.trim().replace(/<[^>]+>/g, " ") || buildResumeText(resumePreview.data);
-  const sectionComparison = useMemo(
-    () => compareResumeSections(sourceResumeText, comparisonGeneratedText),
-    [sourceResumeText, comparisonGeneratedText]
-  );
-
-  const extractTextFromAnalyze = (data) => {
-    if (!data || typeof data !== "object") return "";
-    const directFields = ["resumeText", "extractedText", "parsedText", "content", "rawText"];
-    for (const field of directFields) {
-      if (typeof data[field] === "string" && data[field].trim().length > 40) {
-        return normalizeText(data[field]);
-      }
-    }
-    if (data.sections && typeof data.sections === "object") {
-      const sectionText = Object.values(data.sections)
-        .filter((value) => typeof value === "string")
-        .join("\n");
-      if (sectionText.trim().length > 40) return normalizeText(sectionText);
-    }
-    return "";
-  };
-
-  const generateAtsResume = async (
-    resumeText,
-    templateId = selectedTemplate,
-    sourceTextOverride = sourceResumeText
-  ) => {
-    const templateMeta =
-      RESUME_TEMPLATES.find((template) => template.id === templateId) || RESUME_TEMPLATES[0];
-    const data = await requestResumeApi("/generate-ats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        resumeText,
-        jobDescription: jobDescription.trim(),
-        templateName: templateMeta.name,
-        sourceResumeText: String(sourceTextOverride || "").trim(),
-      }),
-    });
-    if (user?.uid) {
-      incrementUserCounter(user.uid, "resumesGenerated").catch(() => {
-        // Metrics sync should not block generate flow.
-      });
-    }
-    return data.optimizedResume || data.generatedResume || data.resume || resumeText;
-  };
-
-  const readExistingResumeText = async (file) => {
-    const isPlainText = file.type === "text/plain" || String(file.name || "").toLowerCase().endsWith(".txt");
-    if (isPlainText) {
-      return normalizeText(await file.text());
-    }
-
-    const formDataPayload = new FormData();
-    formDataPayload.append("file", file);
-    if (jobDescription.trim()) {
-      formDataPayload.append("jobDescription", jobDescription.trim());
-    }
-
-    try {
-      const analyzeData = await requestResumeApi("/analyze", {
-        method: "POST",
-        body: formDataPayload,
-      });
-      if (analyzeData && typeof analyzeData === "object") {
-        if (user?.uid) {
-          incrementUserCounter(user.uid, "resumesChecked").catch(() => {
-            // Metrics sync should not block resume extraction.
-          });
-        }
-        const extracted = extractTextFromAnalyze(analyzeData);
-        if (extracted) return extracted;
-      }
-    } catch (_e) {
-      // Continue with local fallback.
-    }
-
-    const fallback = normalizeText(await file.text());
-    if (fallback.length < 40) {
-      throw new Error(
-        "Could not extract resume text. For PDF/DOCX, ensure backend analyze response includes extracted text."
-      );
-    }
-    return fallback;
-  };
+  const progress = Math.round(((step + 1) / STEPS.length) * 100);
 
   const consumeBuilderGuestTryOrRedirect = () => {
     if (user) return true;
@@ -1809,58 +713,53 @@ export default function ResumeBuilder({
     setImportLoading(true);
     setError("");
     setImportMessage("");
-
     try {
-      const extractedText = await readExistingResumeText(existingFile);
-      const parsed = parseUploadedResumeText(extractedText);
-      const mergedData = mergeIntoBuilderData(parsed);
-      setFormData(mergedData);
-      setSourceResumeText(extractedText);
-
-      if (!consumeBuilderGuestTryOrRedirect()) {
-        return;
-      }
-
-      try {
-        const importedPreview = preserveOriginalData
-          ? { data: mergedData }
-          : compactResumeForOnePage(mergedData);
-        const optimizedText = await generateAtsResume(
-          buildResumeText(importedPreview.data),
-          selectedTemplate,
-          extractedText
-        );
-        setGeneratedResume(optimizedText);
-      } catch (genErr) {
-        const importedPreview = preserveOriginalData
-          ? { data: mergedData }
-          : compactResumeForOnePage(mergedData);
-        setGeneratedResume(buildResumeText(importedPreview.data));
-        setError(`${genErr.message}. Using local optimized draft.`);
-      }
-
-      setStep(5);
-      setImportMessage("Resume extracted and auto-filled. Review templates and export without losing original details.");
+      const payload = new FormData();
+      payload.append("file", existingFile);
+      const parsed = await requestParseBuilderResume(payload);
+      const structured = sanitizeStructuredData(parsed?.structuredData || {});
+      setFormData(structured);
+      setGeneratedStructured(null);
+      setGeneratedResume("");
+      setBuildId(null);
+      setSourceResumeText(cleanText(parsed?.resumeText));
+      setImportMessage("Resume extracted and pre-filled. Review and edit any field before generation.");
+      setStep(0);
     } catch (err) {
-      setError(err.message || "Failed to extract data from uploaded resume.");
+      setError(err.message || "Failed to extract structured resume data.");
     } finally {
       setImportLoading(false);
     }
   };
 
   const handleGenerate = async (templateId = selectedTemplate) => {
-    if (!consumeBuilderGuestTryOrRedirect()) {
-      return;
-    }
+    if (!consumeBuilderGuestTryOrRedirect()) return;
+
     setLoading(true);
     setError("");
     try {
-      const resumeText = buildResumeText(resumePreview.data);
-      const optimized = await generateAtsResume(resumeText, templateId);
-      setGeneratedResume(optimized);
+      const templateMeta = RESUME_TEMPLATES.find((template) => template.id === templateId) || RESUME_TEMPLATES[0];
+      const safeData = sanitizeStructuredData(formData);
+      const response = await requestGenerateStructuredResume({
+        structuredResume: safeData,
+        jobDescription: cleanText(jobDescription),
+        templateName: templateMeta.name,
+        sourceResumeText: cleanText(sourceResumeText),
+        userEmail: user?.email || "anonymous",
+      });
+
+      setGeneratedResume(cleanText(response?.optimizedResume));
+      setGeneratedStructured(sanitizeStructuredData(response?.structuredResume || safeData));
+      setBuildId(response?.buildId || null);
+      setStep(STEPS.length - 1);
+
+      if (user?.uid) {
+        incrementUserCounter(user.uid, "resumesGenerated").catch(() => {
+          // Metrics sync should not block generate flow.
+        });
+      }
     } catch (err) {
-      setError(`${err.message} - falling back to local export.`);
-      setGeneratedResume(buildResumeText(resumePreview.data));
+      setError(err.message || "Failed to generate resume.");
     } finally {
       setLoading(false);
     }
@@ -1874,86 +773,136 @@ export default function ResumeBuilder({
   };
 
   const handleDownloadPdf = async () => {
-    if (!generatedResume.trim()) {
-      setError("Generate resume first, then download PDF.");
-      return;
-    }
     if (!previewRef.current) {
       setError("Preview is not ready yet. Please try again.");
       return;
     }
+    setIsExportingPdf(true);
+    setError("");
     try {
-      setIsExportingPdf(true);
-      setTemplateMessage("");
       await exportNodeAsPdf(previewRef.current, pdfFileName);
-      setTemplateMessage("Resume PDF downloaded successfully.");
-    } catch (_err) {
-      setError("Could not generate styled PDF. Please try again.");
+      if (buildId) {
+        await markBuildDownload(buildId, user?.email || "anonymous");
+      }
+    } catch (err) {
+      setError(err.message || "Could not generate styled PDF. Please try again.");
     } finally {
       setIsExportingPdf(false);
     }
   };
 
-  const progress = Math.round(((step + 1) / STEPS.length) * 100);
+  const sectionRenderer = () => {
+    if (step === 0) {
+      return <ContactStep data={formData} onChange={(next) => setFormData(sanitizeStructuredData(next))} />;
+    }
+    if (step === 1) {
+      return <SummaryStep summary={formData.summary} onChange={(value) => setFormData(sanitizeStructuredData({ ...formData, summary: value }))} />;
+    }
+    if (step === 2) {
+      return <SkillsStep skills={formData.skills} onChange={(skills) => setFormData(sanitizeStructuredData({ ...formData, skills }))} />;
+    }
+    if (step === 3) {
+      return <ExperienceStep experience={formData.experience} onChange={(experience) => setFormData(sanitizeStructuredData({ ...formData, experience }))} />;
+    }
+    if (step === 4) {
+      return <EducationStep education={formData.education} onChange={(education) => setFormData(sanitizeStructuredData({ ...formData, education }))} />;
+    }
+    if (step === 5) {
+      return <ProjectsStep projects={formData.projects} onChange={(projects) => setFormData(sanitizeStructuredData({ ...formData, projects }))} />;
+    }
+    if (step === 6) {
+      return <CertificationsStep certifications={formData.certifications} onChange={(certifications) => setFormData(sanitizeStructuredData({ ...formData, certifications }))} />;
+    }
+
+    return (
+      <div>
+        <div className="form-group">
+          <label className="form-label">choose_template</label>
+          <TemplateGallery
+            templates={RESUME_TEMPLATES}
+            selectedTemplate={selectedTemplate}
+            onSelect={setSelectedTemplate}
+            onConfirm={handleTemplateConfirm}
+            loading={loading}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">job_description_for_optimization (optional)</label>
+          <textarea
+            className="form-textarea"
+            rows={4}
+            value={jobDescription}
+            onChange={(event) => setJobDescription(event.target.value)}
+            placeholder="Paste target job description..."
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">custom_pdf_name</label>
+          <input
+            className="form-input"
+            value={pdfFileName}
+            onChange={(event) => setPdfFileName(event.target.value)}
+            placeholder="resume_ats_optimized"
+          />
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+          <button className="btn-primary" onClick={() => handleGenerate(selectedTemplate)} disabled={loading}>
+            {loading ? "generating..." : "generate_resume()"}
+          </button>
+          <button className="btn-secondary" onClick={handleDownloadPdf} disabled={isExportingPdf}>
+            {isExportingPdf ? "exporting..." : "download_pdf()"}
+          </button>
+        </div>
+        {generatedResume ? (
+          <div style={{ marginTop: 12 }}>
+            <label className="form-label">generated_output_preview</label>
+            <pre
+              style={{
+                background: "#f5f5f5",
+                border: "1px solid #d1d5db",
+                borderRadius: 8,
+                padding: 12,
+                maxHeight: 280,
+                overflow: "auto",
+                color: "#1a1a1a",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {generatedResume}
+            </pre>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div>
       <Navbar navigate={navigate} user={user} onLogout={onLogout} />
 
-      <div
-        style={{ maxWidth: 1120, margin: "0 auto", padding: "3.5rem 2rem" }}
-      >
-        <div style={{ marginBottom: "1.5rem" }}>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--g)",
-              marginBottom: 6,
-            }}
-          >
+      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "3.5rem 2rem" }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--g)", marginBottom: 6 }}>
             # resume_builder()
           </div>
-          <h1
-            style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700 }}
-          >
-            Build or improve your resume for a higher ATS score.
+          <h1 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700 }}>
+            Build or improve your resume with structured data.
           </h1>
         </div>
 
-        {!user && (
-          <div
-            style={{
-              background: "rgba(0,229,255,0.06)",
-              border: "1px solid rgba(0,229,255,0.2)",
-              borderRadius: 8,
-              padding: "10px 14px",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              color: "var(--c)",
-              marginBottom: "1rem",
-            }}
-          >
-            guest_limit: builder tries left = {guestBuilderUsed ? 0 : 1}
-          </div>
-        )}
-
-        <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-head">import_existing_resume()</div>
-          <div style={{ padding: "1.25rem" }}>
-            <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: "0.9rem" }}>
-              Already have a resume? Upload it to extract data, prefill this builder, and generate
-              a stronger ATS-friendly version.
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ padding: 14 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <input
                 className="form-input"
                 type="file"
                 accept={RESUME_FILE_ACCEPT}
-                onChange={(e) => {
-                  setExistingFile(e.target.files?.[0] || null);
+                onChange={(event) => {
+                  setExistingFile(event.target.files?.[0] || null);
                   setImportMessage("");
-                  setSourceResumeText("");
                 }}
                 style={{ maxWidth: 420 }}
               />
@@ -1961,247 +910,67 @@ export default function ResumeBuilder({
                 {importLoading ? "extracting..." : "extract_and_prefill()"}
               </button>
             </div>
-            {existingFile && (
-              <div
-                style={{
-                  marginTop: "0.6rem",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  color: "var(--muted)",
-                }}
-              >
+            {existingFile ? (
+              <div style={{ marginTop: 8, color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
                 selected: {existingFile.name}
               </div>
-            )}
-            {importMessage && (
-              <div
-                style={{
-                  marginTop: "0.9rem",
-                  background: "rgba(0,255,136,0.06)",
-                  border: "1px solid rgba(0,255,136,0.2)",
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  color: "var(--g)",
-                }}
-              >
+            ) : null}
+            {importMessage ? (
+              <div style={{ marginTop: 10, border: "1px solid rgba(22, 163, 74, 0.4)", background: "rgba(22, 163, 74, 0.08)", borderRadius: 8, padding: "9px 12px", color: "#166534", fontSize: 12 }}>
                 {importMessage}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
-        <div style={{ marginBottom: "2rem" }}>
+        {!user ? (
+          <div style={{ background: "rgba(14, 165, 233, 0.08)", border: "1px solid rgba(14, 165, 233, 0.3)", borderRadius: 8, padding: "10px 14px", fontFamily: "var(--font-mono)", fontSize: 12, color: "#075985", marginBottom: 12 }}>
+            guest_limit: builder tries left = {guestBuilderUsed ? 0 : 1}
+          </div>
+        ) : null}
+
+        <div style={{ marginBottom: 16 }}>
           <div className="progress-wrap">
             <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              color: "var(--muted)",
-              marginTop: 6,
-            }}
-          >
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 6 }}>
             step_{step + 1} / {STEPS.length} - {STEPS[step]}
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            marginBottom: "2rem",
-            overflowX: "auto",
-            paddingBottom: 4,
-          }}
-        >
-          {STEPS.map((s, i) => (
-            <button
-              key={s}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                padding: "7px 14px",
-                borderRadius: 6,
-                border: `1px solid ${i === step ? "var(--g)" : "var(--border)"}`,
-                background: i === step ? "rgba(0,255,136,0.1)" : "var(--d2)",
-                color: i < step ? "var(--g)" : i === step ? "var(--g)" : "var(--muted)",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.2s",
-              }}
-              onClick={() => setStep(i)}
-            >
-              {i < step ? "ok " : ""}
-              {s.replace(" ", "_").toLowerCase()}
-            </button>
-          ))}
-        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+          <div className="card">
+            <div className="card-head">{STEPS[step].toLowerCase()}.edit()</div>
+            <div style={{ padding: 14 }}>
+              {sectionRenderer()}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "2rem",
-            alignItems: "start",
-          }}
-        >
-          <div
-            className="card"
-            style={{ animation: "fadeUp 0.4s ease" }}
-            key={step}
-          >
-            <div className="card-head">
-              {STEPS[step].replace(" ", "_").toLowerCase()}.fill()
-            </div>
-            <div style={{ padding: "1.5rem" }}>
-              {step === 0 && (
-                <PersonalForm
-                  data={formData.personal}
-                  onChange={(v) => setFormData({ ...formData, personal: v })}
-                />
-              )}
-              {step === 1 && (
-                <ExperienceForm
-                  data={formData.experience}
-                  onChange={(v) => setFormData({ ...formData, experience: v })}
-                />
-              )}
-              {step === 2 && (
-                <EducationForm
-                  data={formData.education}
-                  onChange={(v) => setFormData({ ...formData, education: v })}
-                />
-              )}
-              {step === 3 && (
-                <SkillsForm
-                  data={formData.skills}
-                  onChange={(v) => setFormData({ ...formData, skills: v })}
-                />
-              )}
-              {step === 4 && (
-                <ProjectsForm
-                  data={formData.projects}
-                  onChange={(v) => setFormData({ ...formData, projects: v })}
-                />
-              )}
-              {step === 5 && (
-                <ExportStep
-                  onGenerate={handleGenerate}
-                  onTemplateConfirm={handleTemplateConfirm}
-                  onDownloadPdf={handleDownloadPdf}
-                  loading={loading || isExportingPdf}
-                  error={error}
-                  generatedResume={generatedResume}
-                  pdfFileName={pdfFileName}
-                  onPdfFileNameChange={setPdfFileName}
-                  jobDescription={jobDescription}
-                  onJobDescriptionChange={setJobDescription}
-                  selectedTemplate={selectedTemplate}
-                  onTemplateChange={setSelectedTemplate}
-                  preserveOriginalData={preserveOriginalData}
-                  onPreserveOriginalDataChange={setPreserveOriginalData}
-                  onePageTrimmed={resumePreview.trimmed}
-                  sectionComparison={sectionComparison}
-                />
-              )}
-
-              {step < 5 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: "1.75rem",
-                    paddingTop: "1.25rem",
-                    borderTop: "1px solid var(--border)",
-                  }}
-                >
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setStep((s) => Math.max(0, s - 1))}
-                    disabled={step === 0}
-                    style={{ opacity: step === 0 ? 0.4 : 1 }}
-                  >
-                    prev()
-                  </button>
-                  <button
-                    className="btn-primary"
-                    onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-                  >
-                    next()
-                  </button>
+              {error ? (
+                <div style={{ marginTop: 12, background: "rgba(220, 38, 38, 0.08)", border: "1px solid rgba(220, 38, 38, 0.25)", borderRadius: 8, padding: "10px 12px", color: "#991b1b", fontSize: 12 }}>
+                  {error}
                 </div>
-              )}
+              ) : null}
+
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+                <button className="btn-ghost" onClick={() => setStep((value) => Math.max(0, value - 1))} disabled={step === 0} style={{ opacity: step === 0 ? 0.5 : 1 }}>
+                  prev()
+                </button>
+                <button className="btn-primary" onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))} disabled={step === STEPS.length - 1} style={{ opacity: step === STEPS.length - 1 ? 0.6 : 1 }}>
+                  next()
+                </button>
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="card">
-              <div
-                className="card-head"
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span>live_preview.pdf</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "var(--muted)",
-                    fontFamily: "var(--font-mono)",
-                  }}
-                >
-                  ATS-safe format
-                </span>
-              </div>
-              <div style={{ padding: "1.25rem", overflowX: "auto" }}>
-                <div ref={previewRef} style={{ minWidth: 320 }}>
-                  <LivePreview formData={resumePreview.data} selectedTemplate={selectedTemplate} />
-                </div>
+          <div className="card">
+            <div className="card-head">live_preview</div>
+            <div style={{ padding: 14 }}>
+              <div ref={previewRef}>
+                <LivePreview structuredData={previewData} selectedTemplate={selectedTemplate} />
               </div>
             </div>
-
-            <div
-              style={{
-                marginTop: "1rem",
-                padding: "10px 14px",
-                background: "rgba(0,229,255,0.05)",
-                border: "1px solid rgba(0,229,255,0.15)",
-                borderRadius: 8,
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--muted)",
-                lineHeight: 1.8,
-              }}
-            >
-              ats_tip: one page only, concise bullets, role-specific keywords, and clean section hierarchy.
-            </div>
-            {templateMessage ? (
-              <div
-                style={{
-                  marginTop: "0.7rem",
-                  background: "rgba(0,255,136,0.06)",
-                  border: "1px solid rgba(0,255,136,0.2)",
-                  borderRadius: 8,
-                  padding: "10px 14px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  color: "var(--g)",
-                }}
-              >
-                {templateMessage}
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-
-
