@@ -1,6 +1,7 @@
-// Purpose: Resume API client for the single MERN backend (:5000 by default).
+// Purpose: Resume and admin API clients for the backend (:5000 by default).
 const configuredBase = String(import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
-const API_BASE = `${configuredBase}/api/resume`;
+const RESUME_API_BASE = `${configuredBase}/api/resume`;
+const ADMIN_API_BASE = `${configuredBase}/api/admin`;
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
 function isRetriableStatus(status) {
@@ -26,9 +27,10 @@ async function parseJson(response) {
   }
 }
 
-function buildApiUrl(path, query) {
-  const base = `${API_BASE}${path}`;
-  if (!query || typeof query !== "object") return base;
+function buildApiUrl(base, path, query) {
+  const normalizedPath = String(path || "").startsWith("/") ? String(path || "") : `/${String(path || "")}`;
+  const url = `${base}${normalizedPath}`;
+  if (!query || typeof query !== "object") return url;
 
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => {
@@ -37,10 +39,10 @@ function buildApiUrl(path, query) {
   });
 
   const queryString = params.toString();
-  return queryString ? `${base}?${queryString}` : base;
+  return queryString ? `${url}?${queryString}` : url;
 }
 
-export async function requestResumeApi(path, options = {}) {
+async function requestApi(base, path, options = {}) {
   const { query, ...fetchOptions } = options;
   let lastError = null;
   const maxAttempts = 2;
@@ -50,7 +52,7 @@ export async function requestResumeApi(path, options = {}) {
     const controller = new AbortController();
     try {
       timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-      const response = await fetch(buildApiUrl(path, query), {
+      const response = await fetch(buildApiUrl(base, path, query), {
         ...fetchOptions,
         signal: fetchOptions.signal || controller.signal,
       });
@@ -90,6 +92,14 @@ export async function requestResumeApi(path, options = {}) {
   throw lastError || new Error("Request failed.");
 }
 
+export function requestResumeApi(path, options = {}) {
+  return requestApi(RESUME_API_BASE, path, options);
+}
+
+export function requestAdminApi(path, options = {}) {
+  return requestApi(ADMIN_API_BASE, path, options);
+}
+
 export function requestHistory(options = {}) {
   const { limit = 25, includeText = false } = options;
   return requestResumeApi("/history", {
@@ -98,4 +108,39 @@ export function requestHistory(options = {}) {
       includeText: includeText ? "1" : "0",
     },
   });
+}
+
+export function requestParseBuilderResume(formData) {
+  return requestResumeApi("/parse-builder", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function requestGenerateStructuredResume(payload) {
+  return requestResumeApi("/generate-ats", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function markBuildDownload(buildId, userEmail = "") {
+  return requestResumeApi(`/builds/${buildId}/download`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userEmail }),
+  });
+}
+
+export function fetchAdminUsers() {
+  return requestAdminApi("/users");
+}
+
+export function fetchAdminAnalyses() {
+  return requestAdminApi("/analyses");
+}
+
+export function fetchAdminBuilds() {
+  return requestAdminApi("/builds");
 }

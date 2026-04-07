@@ -62,6 +62,7 @@ export default function UploadResume({
       const formData = new FormData();
       formData.append("file", file);
       if (jobDesc.trim()) formData.append("jobDescription", jobDesc.trim());
+      formData.append("userEmail", user?.email || "anonymous");
 
       const data = await requestResumeApi("/analyze", {
         method: "POST",
@@ -156,7 +157,7 @@ export default function UploadResume({
                     fontSize: 12,
                     fontWeight: 600,
                     background: s.active ? "var(--g)" : "var(--d2)",
-                    color: s.active ? "var(--dark)" : "var(--muted)",
+                    color: s.active ? "#ffffff" : "var(--muted)",
                     border: `1.5px solid ${s.active ? "var(--g)" : "var(--border)"}`,
                     transition: "all 0.3s",
                   }}
