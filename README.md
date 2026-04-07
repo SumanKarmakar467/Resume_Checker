@@ -118,6 +118,7 @@ VITE_API_TIMEOUT_MS=20000
 
 `VITE_ADMIN_EMAIL` is optional and only used to show/hide the admin dashboard link.
 `VITE_API_TIMEOUT_MS` is optional and controls frontend API timeout in milliseconds.
+If `VITE_ADMIN_EMAIL` is not set, the first registered account becomes the local owner/admin by default.
 
 ## Run Locally
 
@@ -160,6 +161,7 @@ curl "http://localhost:5000/api/resume/history?limit=10"
 - `/upload` -> upload resume + analyze
 - `/result` -> ATS score, keywords, suggestions, optimized resume download
 - `/history` -> past analysis records from MongoDB
+- `/admin` -> admin dashboard (owner/admin only)
 
 ## Tech Stack
 

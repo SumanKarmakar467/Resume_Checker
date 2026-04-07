@@ -377,9 +377,215 @@ function compactResumeForOnePage(data) {
   };
 }
 
+const DATE_RANGE_PATTERN =
+  /((19|20)\d{2}\s*(?:-|to)\s*(?:present|(19|20)\d{2}))|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}\s*(?:-|to)\s*(?:present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}))/i;
+
+function splitIntoParagraphs(lines = []) {
+  const paragraphs = [];
+  let current = [];
+
+  lines.forEach((line) => {
+    const normalized = String(line || "").replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      if (current.length) {
+        paragraphs.push(current);
+        current = [];
+      }
+      return;
+    }
+    current.push(normalized);
+  });
+
+  if (current.length) {
+    paragraphs.push(current);
+  }
+
+  return paragraphs;
+}
+
+function cleanBulletPrefix(line) {
+  return String(line || "").replace(/^[-*\u2022]\s*/, "").trim();
+}
+
+function extractDurationFromText(text) {
+  return pickMatch(text, DATE_RANGE_PATTERN);
+}
+
+function parseExperienceEntries(lines = []) {
+  const paragraphs = splitIntoParagraphs(lines);
+  const parsed = [];
+
+  paragraphs.forEach((paragraph) => {
+    const items = paragraph.map((line) => cleanBulletPrefix(line)).filter(Boolean);
+    if (!items.length) return;
+
+    const header = items[0] || "";
+    const duration = extractDurationFromText(items.join(" "));
+    let role = "";
+    let company = "";
+
+    if (header.includes("@")) {
+      const [left, right] = header.split("@").map((part) => part.trim());
+      role = left || "";
+      company = right?.split("|")?.[0]?.trim() || "";
+    } else if (header.includes("|")) {
+      const parts = header.split("|").map((part) => part.trim()).filter(Boolean);
+      role = parts[0] || "";
+      company = parts[1] || "";
+    } else {
+      const dashParts = header.split(/\s(?:-|\u2013)\s/).map((part) => part.trim()).filter(Boolean);
+      role = dashParts[0] || header;
+      company = dashParts[1] || "";
+    }
+
+    const bullets = items.slice(1).filter(Boolean);
+    if (role || company || duration || bullets.length) {
+      parsed.push({
+        company,
+        role: role || (duration ? "Experience" : ""),
+        duration,
+        bullets: bullets.length ? bullets : [""],
+      });
+    }
+  });
+
+  return parsed.length ? parsed : EMPTY.experience;
+}
+
+function parseEducationEntries(lines = []) {
+  const degreePattern =
+    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma|h\.?s|high school)[^,|]*/i;
+  const yearPattern = /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i;
+  const paragraphs = splitIntoParagraphs(lines);
+  const parsed = [];
+
+  paragraphs.forEach((paragraph) => {
+    const combined = paragraph.join(" | ");
+    const firstLine = paragraph[0] || "";
+    const parts = firstLine.split("|").map((part) => part.trim()).filter(Boolean);
+    const degree = pickMatch(combined, degreePattern);
+    const year = pickMatch(combined, yearPattern);
+
+    let institute = parts[0] || firstLine;
+    if (degree) {
+      institute = institute.replace(degree, "").trim();
+    }
+    if (year) {
+      institute = institute.replace(year, "").trim();
+    }
+    institute = institute.replace(/[,-]+$/g, "").trim();
+
+    const normalizedDegree = degree || parts[1] || "";
+    const normalizedYear = year || parts[2] || "";
+
+    if (institute || normalizedDegree || normalizedYear) {
+      parsed.push({
+        institute,
+        degree: normalizedDegree,
+        year: normalizedYear,
+      });
+    }
+  });
+
+  return parsed.length ? parsed : EMPTY.education;
+}
+
+function parseSkillEntries(skillLines = [], fallbackText = "") {
+  const splitTokens = (value) =>
+    String(value || "")
+      .replace(/^[-*\u2022]\s*/, "")
+      .split(/,|\||\/|;|\u2022/)
+      .map((token) => token.trim())
+      .filter((token) => token && token.length <= 48 && /[A-Za-z]/.test(token));
+
+  const uniqueByCase = (tokens) => {
+    const seen = new Set();
+    const output = [];
+    tokens.forEach((token) => {
+      const key = token.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      output.push(token);
+    });
+    return output;
+  };
+
+  const categories = {
+    technical: [],
+    tools: [],
+    languages: [],
+  };
+
+  skillLines.forEach((line) => {
+    const normalized = String(line || "").trim();
+    if (!normalized) return;
+
+    if (/^languages?\s*:/i.test(normalized)) {
+      categories.languages.push(...splitTokens(normalized.replace(/^languages?\s*:/i, "")));
+      return;
+    }
+    if (/^(tools?|platforms?|frameworks?)\s*:/i.test(normalized)) {
+      categories.tools.push(...splitTokens(normalized.replace(/^(tools?|platforms?|frameworks?)\s*:/i, "")));
+      return;
+    }
+    if (/^(technical skills?|skills?)\s*:/i.test(normalized)) {
+      categories.technical.push(...splitTokens(normalized.replace(/^(technical skills?|skills?)\s*:/i, "")));
+      return;
+    }
+    categories.technical.push(...splitTokens(normalized));
+  });
+
+  if (!categories.technical.length && !categories.tools.length && !categories.languages.length) {
+    const fallbackTokens = uniqueByCase(splitTokens(fallbackText)).slice(0, 60);
+    categories.technical = fallbackTokens.slice(0, 28);
+    categories.tools = fallbackTokens.slice(28, 44);
+    categories.languages = fallbackTokens.slice(44);
+  }
+
+  return {
+    technical: uniqueByCase(categories.technical).join(", "),
+    tools: uniqueByCase(categories.tools).join(", "),
+    languages: uniqueByCase(categories.languages).join(", "),
+  };
+}
+
+function parseProjectEntries(lines = [], allUrls = []) {
+  const paragraphs = splitIntoParagraphs(lines);
+  const parsed = [];
+
+  paragraphs.forEach((paragraph) => {
+    const combined = paragraph.join(" ");
+    const paragraphUrls = Array.from(
+      new Set(
+        (combined.match(/(?:https?:\/\/|www\.)[^\s)]+/gi) || []).map((url) =>
+          url.replace(/[),.;]+$/g, "")
+        )
+      )
+    );
+    const link = paragraphUrls[0] || "";
+    const nonUrlLines = paragraph.filter((line) => !/(https?:\/\/|www\.)/i.test(line));
+    const name = (nonUrlLines[0] || "").trim();
+    const desc = nonUrlLines.slice(1).join(" ").trim();
+
+    if (name || link || desc) {
+      parsed.push({ name, link, desc });
+    }
+  });
+
+  if (!parsed.length && allUrls.length) {
+    const backupLink = allUrls.find((url) => !/linkedin\.com|github\.com/i.test(url)) || "";
+    if (backupLink) {
+      parsed.push({ name: "Project", link: backupLink, desc: "" });
+    }
+  }
+
+  return parsed.length ? parsed : EMPTY.projects;
+}
+
 function parseUploadedResumeText(rawText) {
   const text = normalizeText(rawText);
-  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const rawLines = text.split("\n").map((line) => line.replace(/\s+$/g, ""));
+  const lines = rawLines.map((line) => line.trim()).filter(Boolean);
 
   const headingMatchers = {
     summary: /^(summary|professional summary|objective|profile|about)\b/i,
@@ -399,7 +605,7 @@ function parseUploadedResumeText(rawText) {
   };
 
   let currentSection = "header";
-  lines.forEach((line) => {
+  rawLines.forEach((line) => {
     const normalized = line.replace(/\s+/g, " ").trim();
     const matchKey = Object.entries(headingMatchers).find(([, regex]) => regex.test(normalized))?.[0];
     if (matchKey) {
@@ -410,7 +616,7 @@ function parseUploadedResumeText(rawText) {
       }
       return;
     }
-    sections[currentSection].push(normalized);
+    sections[currentSection].push(line);
   });
 
   const email = pickMatch(text, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
@@ -444,78 +650,21 @@ function parseUploadedResumeText(rawText) {
     ) || "";
 
   const maybeHeadline =
-    sections.header.find(
-      (line) =>
-        line.length >= 8 &&
-        line.length <= 80 &&
-        !/@/.test(line) &&
-        !/(linkedin|github|www\.|http)/i.test(line)
-    ) || "";
+    sections.header
+      .map((line) => String(line || "").trim())
+      .find(
+        (line) =>
+          line.length >= 8 &&
+          line.length <= 80 &&
+          !/@/.test(line) &&
+          !/(linkedin|github|www\.|http)/i.test(line)
+      ) || "";
 
-  const maybeSummary = (sections.summary.length
-    ? sections.summary.join(" ")
-    : sections.header.find((line) => line.length > 70 && line.length < 320) || "").trim();
-
-  const expLines = sections.experience.filter((line) => !headingMatchers.experience.test(line));
-  const expHeader = expLines.find((line) => /@|\||\s-\s/.test(line)) || expLines[0] || "";
-  let role = "";
-  let company = "";
-  let duration = pickMatch(
-    [expHeader, ...expLines].join(" "),
-    /((19|20)\d{2}\s*(?:-|to)\s*(?:present|(19|20)\d{2}))|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}\s*(?:-|to)\s*(?:present|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(19|20)\d{2}))/i
-  );
-  if (expHeader.includes("@")) {
-    const [left, right] = expHeader.split("@").map((part) => part.trim());
-    role = left;
-    company = right?.split("|")?.[0]?.trim() || "";
-  } else {
-    const parts = expHeader.split("|").map((part) => part.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      role = parts[0];
-      company = parts[1];
-      duration = duration || parts[2] || "";
-    } else {
-      role = expHeader;
-    }
-  }
-  if (!role && /intern(ship)?/i.test(expLines.join(" "))) {
-    role = "Intern";
-  }
-  const bullets = expLines
-    .filter((line) => /^[-*•]/.test(line) || /^(built|led|developed|implemented|improved|created|designed|optimized|managed)/i.test(line))
-    .map((line) => line.replace(/^[-*•]\s*/, "").trim())
-    .filter(Boolean)
-    .slice(0, 6);
-
-  const eduLines = sections.education.filter((line) => !headingMatchers.education.test(line));
-  const eduLine = eduLines[0] || "";
-  const degree = pickMatch(
-    eduLine,
-    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma|h\.?s|high school)[^,|]*/i
-  );
-  const year = pickMatch(eduLine, /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i);
-  const institute = eduLine
-    .replace(degree, "")
-    .replace(year, "")
-    .replace(/[|,-]/g, " ")
-    .replace(/[ ]{2,}/g, " ")
-    .trim();
-
-  const skillsSource = sections.skills.length ? sections.skills.join(",") : text;
-  const skillTokens = skillsSource
-    .split(/,|\n|\||\/|•/)
-    .map((item) => item.trim())
-    .filter((item) => item && item.length <= 32 && /[A-Za-z]/.test(item))
-    .filter((item, index, arr) => arr.findIndex((entry) => entry.toLowerCase() === item.toLowerCase()) === index)
-    .slice(0, 24);
-
-  const projectsLines = sections.projects.filter((line) => !headingMatchers.projects.test(line));
-  const projectName = projectsLines.find((line) => !/(https?:\/\/|www\.)/i.test(line)) || "";
-  const projectLink =
-    projectsLines.find((line) => /(https?:\/\/|www\.)/i.test(line)) ||
-    allUrls.find((url) => !/linkedin\.com|github\.com/i.test(url)) ||
-    "";
-  const projectDesc = projectsLines.slice(1, 4).join(" ");
+  const maybeSummary = (
+    sections.summary.length
+      ? sections.summary.join(" ")
+      : lines.find((line) => line.length > 70 && line.length < 320) || ""
+  ).trim();
 
   return {
     personal: {
@@ -530,35 +679,15 @@ function parseUploadedResumeText(rawText) {
       summary: maybeSummary,
       photoUrl: "",
     },
-    experience: [
-      {
-        company,
-        role,
-        duration,
-        bullets: bullets.length ? bullets : ["", ""],
-      },
-    ],
-    education: [
-      {
-        institute,
-        degree,
-        year,
-      },
-    ],
-    skills: {
-      technical: skillTokens.slice(0, 12).join(", "),
-      tools: skillTokens.slice(12, 20).join(", "),
-      languages: "",
-    },
-    projects: [
-      {
-        name: projectName,
-        link: projectLink,
-        desc: projectDesc,
-      },
-    ],
+    experience: parseExperienceEntries(sections.experience),
+    education: parseEducationEntries(sections.education),
+    skills: parseSkillEntries(
+      sections.skills.map((line) => String(line || "").trim()).filter(Boolean),
+      sections.skills.length ? sections.skills.join(", ") : text
+    ),
+    projects: parseProjectEntries(sections.projects, allUrls),
     rawText: text,
-    sectionCount: Object.values(sections).filter((value) => value.length).length,
+    sectionCount: Object.values(sections).filter((value) => value.some((line) => String(line || "").trim())).length,
   };
 }
 
@@ -588,20 +717,52 @@ async function exportNodeAsPdf(node, fileName) {
     backgroundColor: "#ffffff",
   });
 
-  const imgData = canvas.toDataURL("image/png");
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 20;
-  const maxWidth = pageWidth - margin * 2;
-  const maxHeight = pageHeight - margin * 2;
-  const fitRatio = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
-  const renderWidth = canvas.width * fitRatio;
-  const renderHeight = canvas.height * fitRatio;
-  const x = (pageWidth - renderWidth) / 2;
-  const y = (pageHeight - renderHeight) / 2;
+  const printableWidth = pageWidth - margin * 2;
+  const printableHeight = pageHeight - margin * 2;
+  const scaleRatio = printableWidth / canvas.width;
+  const pageSliceHeightPx = Math.max(1, Math.floor(printableHeight / scaleRatio));
 
-  pdf.addImage(imgData, "PNG", x, y, renderWidth, renderHeight, undefined, "FAST");
+  let sourceY = 0;
+  let pageIndex = 0;
+
+  while (sourceY < canvas.height) {
+    const sliceHeight = Math.min(pageSliceHeightPx, canvas.height - sourceY);
+    const sliceCanvas = document.createElement("canvas");
+    sliceCanvas.width = canvas.width;
+    sliceCanvas.height = sliceHeight;
+
+    const context = sliceCanvas.getContext("2d");
+    if (!context) break;
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+    context.drawImage(
+      canvas,
+      0,
+      sourceY,
+      canvas.width,
+      sliceHeight,
+      0,
+      0,
+      canvas.width,
+      sliceHeight
+    );
+
+    const pageImage = sliceCanvas.toDataURL("image/png");
+    if (pageIndex > 0) {
+      pdf.addPage("a4", "p");
+    }
+
+    const renderHeight = sliceHeight * scaleRatio;
+    pdf.addImage(pageImage, "PNG", margin, margin, printableWidth, renderHeight, undefined, "FAST");
+
+    sourceY += sliceHeight;
+    pageIndex += 1;
+  }
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
@@ -633,7 +794,7 @@ function PersonalForm({ data, onChange }) {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
         {fields.map(([key, label, type, placeholder]) => (
           <div key={key} className="form-group">
             <label className="form-label">{label}</label>
@@ -729,7 +890,7 @@ function ExperienceForm({ data, onChange }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               gap: "0.75rem",
               marginBottom: "0.75rem",
             }}
@@ -795,7 +956,7 @@ function EducationForm({ data, onChange }) {
             padding: "1.25rem",
             marginBottom: "1rem",
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "0.75rem",
           }}
         >
@@ -883,7 +1044,7 @@ function ProjectsForm({ data, onChange }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "0.75rem",
               marginBottom: "0.75rem",
             }}
@@ -940,6 +1101,8 @@ function ExportStep({
   onJobDescriptionChange,
   selectedTemplate,
   onTemplateChange,
+  preserveOriginalData,
+  onPreserveOriginalDataChange,
   onePageTrimmed,
   sectionComparison,
 }) {
@@ -961,6 +1124,25 @@ function ExportStep({
           onConfirm={onTemplateConfirm}
           loading={loading}
         />
+        <label
+          style={{
+            marginTop: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--text-primary)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={preserveOriginalData}
+            onChange={(event) => onPreserveOriginalDataChange(event.target.checked)}
+          />
+          preserve_original_data (recommended)
+        </label>
         <div
           style={{
             marginTop: 8,
@@ -973,9 +1155,9 @@ function ExportStep({
             color: "var(--g)",
           }}
         >
-          one_page_mode: enabled (PDF export is always 1 page)
+          export_mode: auto-multi-page (no content clipping)
         </div>
-        {onePageTrimmed ? (
+        {!preserveOriginalData && onePageTrimmed ? (
           <div
             style={{
               marginTop: 8,
@@ -988,7 +1170,7 @@ function ExportStep({
               color: "var(--warning-text)",
             }}
           >
-            note: extra content is auto-trimmed in preview/export to keep one page.
+            note: compact mode removed some long content to fit faster one-page layout.
           </div>
         ) : null}
       </div>
@@ -1148,17 +1330,26 @@ function ExportStep({
               overflow: "hidden",
             }}
           >
-            <iframe
-              title="generated-template-preview"
-              srcDoc={generatedResume}
+            <pre
               style={{
-                border: "none",
+                border: "1px solid rgba(0,255,136,0.2)",
                 width: "100%",
-                height: 300,
+                maxHeight: 300,
                 borderRadius: 8,
                 background: "#fff",
+                margin: 0,
+                padding: "0.75rem",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11.5,
+                color: "#111827",
+                lineHeight: 1.65,
               }}
-            />
+            >
+              {generatedResume}
+            </pre>
           </div>
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button className="btn-primary" style={{ fontSize: 14 }} onClick={onDownloadPdf} disabled={loading}>
@@ -1189,10 +1380,11 @@ function LivePreview({ formData, selectedTemplate }) {
     lineHeight: 1.52,
     borderRadius: 8,
     border: `1px solid ${template.border}`,
-    overflow: "hidden",
     width: "100%",
-    aspectRatio: "210 / 297",
+    minHeight: 940,
     boxShadow: "0 8px 18px rgba(2, 6, 23, 0.08)",
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
   };
 
   const sectionTitle = (label) => (
@@ -1215,7 +1407,7 @@ function LivePreview({ formData, selectedTemplate }) {
   if (template.id === "modern_split") {
     return (
       <div style={pageShell}>
-        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr", height: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.34fr 0.66fr" }}>
           <div style={{ background: template.sideBg, padding: "16px 12px" }}>
             {personal.photoUrl ? (
               <img
@@ -1430,10 +1622,14 @@ export default function ResumeBuilder({
   const [jobDescription, setJobDescription] = useState("");
   const [pdfFileName, setPdfFileName] = useState("resume_ats_optimized");
   const [selectedTemplate, setSelectedTemplate] = useState("ats_clean");
+  const [preserveOriginalData, setPreserveOriginalData] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [templateMessage, setTemplateMessage] = useState("");
   const previewRef = useRef(null);
-  const onePagePreview = useMemo(() => compactResumeForOnePage(formData), [formData]);
+  const resumePreview = useMemo(
+    () => (preserveOriginalData ? { trimmed: false, data: formData } : compactResumeForOnePage(formData)),
+    [formData, preserveOriginalData]
+  );
 
   const buildResumeText = (d) => {
     const lines = [];
@@ -1493,7 +1689,7 @@ export default function ResumeBuilder({
   };
 
   const comparisonGeneratedText =
-    generatedResume.trim().replace(/<[^>]+>/g, " ") || buildResumeText(onePagePreview.data);
+    generatedResume.trim().replace(/<[^>]+>/g, " ") || buildResumeText(resumePreview.data);
   const sectionComparison = useMemo(
     () => compareResumeSections(sourceResumeText, comparisonGeneratedText),
     [sourceResumeText, comparisonGeneratedText]
@@ -1516,7 +1712,11 @@ export default function ResumeBuilder({
     return "";
   };
 
-  const generateAtsResume = async (resumeText, templateId = selectedTemplate) => {
+  const generateAtsResume = async (
+    resumeText,
+    templateId = selectedTemplate,
+    sourceTextOverride = sourceResumeText
+  ) => {
     const templateMeta =
       RESUME_TEMPLATES.find((template) => template.id === templateId) || RESUME_TEMPLATES[0];
     const data = await requestResumeApi("/generate-ats", {
@@ -1526,6 +1726,7 @@ export default function ResumeBuilder({
         resumeText,
         jobDescription: jobDescription.trim(),
         templateName: templateMeta.name,
+        sourceResumeText: String(sourceTextOverride || "").trim(),
       }),
     });
     if (user?.uid) {
@@ -1613,7 +1814,6 @@ export default function ResumeBuilder({
       const extractedText = await readExistingResumeText(existingFile);
       const parsed = parseUploadedResumeText(extractedText);
       const mergedData = mergeIntoBuilderData(parsed);
-      const importedOnePage = compactResumeForOnePage(mergedData);
       setFormData(mergedData);
       setSourceResumeText(extractedText);
 
@@ -1622,15 +1822,25 @@ export default function ResumeBuilder({
       }
 
       try {
-        const optimizedText = await generateAtsResume(buildResumeText(importedOnePage.data), selectedTemplate);
+        const importedPreview = preserveOriginalData
+          ? { data: mergedData }
+          : compactResumeForOnePage(mergedData);
+        const optimizedText = await generateAtsResume(
+          buildResumeText(importedPreview.data),
+          selectedTemplate,
+          extractedText
+        );
         setGeneratedResume(optimizedText);
       } catch (genErr) {
-        setGeneratedResume(buildResumeText(importedOnePage.data));
+        const importedPreview = preserveOriginalData
+          ? { data: mergedData }
+          : compactResumeForOnePage(mergedData);
+        setGeneratedResume(buildResumeText(importedPreview.data));
         setError(`${genErr.message}. Using local optimized draft.`);
       }
 
       setStep(5);
-      setImportMessage("Resume extracted and auto-filled. One-page preview is ready for template selection and download.");
+      setImportMessage("Resume extracted and auto-filled. Review templates and export without losing original details.");
     } catch (err) {
       setError(err.message || "Failed to extract data from uploaded resume.");
     } finally {
@@ -1645,12 +1855,12 @@ export default function ResumeBuilder({
     setLoading(true);
     setError("");
     try {
-      const resumeText = buildResumeText(onePagePreview.data);
+      const resumeText = buildResumeText(resumePreview.data);
       const optimized = await generateAtsResume(resumeText, templateId);
       setGeneratedResume(optimized);
     } catch (err) {
       setError(`${err.message} - falling back to local export.`);
-      setGeneratedResume(buildResumeText(onePagePreview.data));
+      setGeneratedResume(buildResumeText(resumePreview.data));
     } finally {
       setLoading(false);
     }
@@ -1676,7 +1886,7 @@ export default function ResumeBuilder({
       setIsExportingPdf(true);
       setTemplateMessage("");
       await exportNodeAsPdf(previewRef.current, pdfFileName);
-      setTemplateMessage("One-page resume PDF downloaded successfully.");
+      setTemplateMessage("Resume PDF downloaded successfully.");
     } catch (_err) {
       setError("Could not generate styled PDF. Please try again.");
     } finally {
@@ -1833,7 +2043,7 @@ export default function ResumeBuilder({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             gap: "2rem",
             alignItems: "start",
           }}
@@ -1891,7 +2101,9 @@ export default function ResumeBuilder({
                   onJobDescriptionChange={setJobDescription}
                   selectedTemplate={selectedTemplate}
                   onTemplateChange={setSelectedTemplate}
-                  onePageTrimmed={onePagePreview.trimmed}
+                  preserveOriginalData={preserveOriginalData}
+                  onPreserveOriginalDataChange={setPreserveOriginalData}
+                  onePageTrimmed={resumePreview.trimmed}
                   sectionComparison={sectionComparison}
                 />
               )}
@@ -1948,7 +2160,7 @@ export default function ResumeBuilder({
               </div>
               <div style={{ padding: "1.25rem", overflowX: "auto" }}>
                 <div ref={previewRef} style={{ minWidth: 320 }}>
-                  <LivePreview formData={onePagePreview.data} selectedTemplate={selectedTemplate} />
+                  <LivePreview formData={resumePreview.data} selectedTemplate={selectedTemplate} />
                 </div>
               </div>
             </div>

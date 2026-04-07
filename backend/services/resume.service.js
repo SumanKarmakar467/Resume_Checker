@@ -260,26 +260,45 @@ async function runGeminiAnalysis(resumeText, jobDescription) {
   return sanitizeAnalysisPayload(payload, resumeText, jobDescription);
 }
 
-async function runGeminiGenerate(resumeText, jobDescription) {
+async function runGeminiGenerate(resumeText, jobDescription, options = {}) {
   const model = getGeminiModel();
   if (!model) {
     throw new Error('GEMINI_API_KEY missing.');
   }
 
+  const templateName = String(options.templateName || '').trim();
+  const sourceResumeText = String(options.sourceResumeText || '').trim();
+
   const prompt = [
-    'Rewrite this resume for ATS optimization.',
+    'Rewrite this resume for ATS optimization while preserving original candidate data.',
     'Return plain text only (no markdown fences).',
-    'Rules: preserve honesty, use clean section headings, concise bullets, role keywords, and quantifiable impact language.',
+    'Rules:',
+    '- Preserve every factual detail from source resume data (roles, companies, dates, projects, education, certifications, achievements, links).',
+    '- Do not remove existing sections; you may reorder and improve phrasing.',
+    '- Preserve honesty and never invent experience.',
+    '- Use clean section headings, concise bullets, role keywords, and quantifiable impact language.',
+    '- Keep formatting ATS-friendly and readable.',
+    '',
+    'TARGET TEMPLATE STYLE:',
+    templateName || 'General ATS Resume',
     '',
     'JOB DESCRIPTION:',
     jobDescription || '(not provided)',
     '',
-    'RESUME TEXT:',
+    'STRUCTURED RESUME TEXT:',
     resumeText || '(empty)'
-  ].join('\n');
+  ];
+
+  if (sourceResumeText) {
+    prompt.push(
+      '',
+      'ORIGINAL SOURCE RESUME (HIGH PRIORITY DATA TO PRESERVE):',
+      sourceResumeText
+    );
+  }
 
   const response = await model.generateContent({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts: [{ text: prompt.join('\n') }] }],
     generationConfig: {
       temperature: 0.35,
     }
@@ -301,12 +320,12 @@ async function analyzeResume(resumeText = '', jobDescription = '') {
   }
 }
 
-async function generateAtsResume(resumeText = '', jobDescription = '') {
+async function generateAtsResume(resumeText = '', jobDescription = '', options = {}) {
   const safeResume = String(resumeText || '').trim();
   const safeJobDescription = String(jobDescription || '').trim();
 
   try {
-    const generated = await runGeminiGenerate(safeResume, safeJobDescription);
+    const generated = await runGeminiGenerate(safeResume, safeJobDescription, options);
     if (generated) return generated;
   } catch (error) {
     console.warn('[ai] Gemini generate fallback:', error.message);

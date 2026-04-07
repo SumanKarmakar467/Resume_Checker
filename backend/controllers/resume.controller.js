@@ -90,7 +90,7 @@ async function analyzeResumeController(req, res, next) {
 
 async function generateAtsController(req, res, next) {
   try {
-    const { resumeText = '', jobDescription = '' } = req.body || {};
+    const { resumeText = '', jobDescription = '', sourceResumeText = '', templateName = '' } = req.body || {};
 
     if (!String(resumeText).trim()) {
       const error = new Error('resumeText is required.');
@@ -98,7 +98,10 @@ async function generateAtsController(req, res, next) {
       throw error;
     }
 
-    const optimizedResume = await generateAtsResume(resumeText, jobDescription);
+    const optimizedResume = await generateAtsResume(resumeText, jobDescription, {
+      sourceResumeText,
+      templateName,
+    });
     return res.status(200).json({ optimizedResume });
   } catch (error) {
     return next(error);

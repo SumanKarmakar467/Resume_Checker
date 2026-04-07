@@ -168,17 +168,17 @@ export default function TemplateGallery({
                   onSelect(template.id);
                 }
               }}
-              className={`group relative overflow-hidden rounded-2xl border p-3 transition-all ${
+              className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-3 transition-all ${
                 selected
                   ? "border-blue-400 bg-slate-900/95 ring-2 ring-blue-500/40"
                   : "border-slate-700 bg-slate-900/75 hover:-translate-y-0.5 hover:border-slate-500 hover:bg-slate-900/90"
               }`}
             >
-              <div className="mb-3">
+              <div className="mb-3 shrink-0">
                 <Thumbnail templateId={template.id} />
               </div>
 
-              <div className="mb-2 flex flex-wrap items-center gap-2">
+              <div className="mb-2 flex min-h-[28px] flex-wrap items-center gap-2">
                 <span className="rounded-full border border-slate-600 bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300">
                   {meta.type}
                 </span>
@@ -190,8 +190,8 @@ export default function TemplateGallery({
                 </span>
               </div>
 
-              <h4 className="text-base font-semibold text-slate-100">{template.name}</h4>
-              <p className="mt-1 text-xs text-slate-400">{template.description}</p>
+              <h4 className="min-h-[48px] text-base font-semibold leading-6 text-slate-100">{template.name}</h4>
+              <p className="mt-1 min-h-[34px] text-xs leading-5 text-slate-400">{template.description}</p>
               <div className="mt-2 text-xs text-cyan-300/90">Style: {meta.vibe}</div>
 
               {selected ? (
@@ -202,12 +202,12 @@ export default function TemplateGallery({
                     onConfirm(template.id);
                   }}
                   disabled={loading}
-                  className="mt-3 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-900"
+                  className="mt-auto w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-900"
                 >
                   {loading ? "Generating..." : "Use this template"}
                 </button>
               ) : (
-                <div className="mt-3 rounded-lg border border-dashed border-slate-700 px-3 py-2 text-center text-xs text-slate-500">
+                <div className="mt-auto rounded-lg border border-dashed border-slate-700 px-3 py-2 text-center text-xs text-slate-500">
                   Click card to select
                 </div>
               )}
