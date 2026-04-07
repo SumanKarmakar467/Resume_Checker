@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 
 const connectDb = require('./config/db');
 const resumeRoutes = require('./routes/resume.routes');
+const adminRoutes = require('./routes/admin.routes');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 dotenv.config();
@@ -51,6 +52,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/resume', resumeRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
