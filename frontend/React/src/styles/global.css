@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --g: #00f5a0;
-  --c: #19d8ff;
-  --p: #b388ff;
-  --o: #ffbb67;
-  --r: #ff5c74;
+  --g: #0f7a4c;
+  --c: #0b5e8e;
+  --p: #6b3fa0;
+  --o: #8a4b00;
+  --r: #b4233a;
   --dark: #0d1117;
   --page-bg: #f6f8fd;
   --nav-bg: rgba(246, 248, 253, 0.92);
@@ -20,11 +20,11 @@
 }
 
 .dark {
-  --g: #00f5a0;
-  --c: #19d8ff;
-  --p: #b388ff;
-  --o: #ffbb67;
-  --r: #ff5c74;
+  --g: #16a34a;
+  --c: #38bdf8;
+  --p: #c084fc;
+  --o: #f59e0b;
+  --r: #fb7185;
   --dark: #000000;
   --page-bg: #000000;
   --nav-bg: rgba(6, 11, 20, 0.92);
@@ -89,7 +89,7 @@ h1, h2, h3, h4, h5 {
   font-size: 13px;
   font-weight: 700;
   background: var(--g);
-  color: var(--dark);
+  color: #ffffff;
   padding: 12px 24px;
   border-radius: 8px;
   border: none;
