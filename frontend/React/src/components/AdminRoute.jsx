@@ -17,7 +17,7 @@ export default function AdminRoute() {
     return <Navigate to="/login" replace />;
   }
 
-  // this 
+  
   const isAdmin = currentUser?.isAdmin || (adminEmail && String(currentUser?.email || "").toLowerCase() === adminEmail);
   if (!isAdmin) {
     return <Navigate to="/" replace />;
