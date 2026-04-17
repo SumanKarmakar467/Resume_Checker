@@ -1,4 +1,4 @@
-﻿<!-- This is a Resume Analyzer  & -->
+﻿<!-- This is a Resume Analyzer  &  also This website can create new Resume -->
 # ATS Resume Checker (MERN)
 
 AI-powered ATS Resume Checker built with **React + Express + MongoDB + Gemini**.
