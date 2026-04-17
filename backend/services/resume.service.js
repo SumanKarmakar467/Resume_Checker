@@ -37,7 +37,7 @@ const STOP_WORDS = new Set([
 ]);
 
 const STRICT_GENERATION_SYSTEM_PROMPT =
-  'You are a professional resume writer. Generate a resume using ONLY the data provided below. Do NOT add fictional data, do NOT remove any provided data. Structure the resume with these exact sections in order: 1) Contact Information 2) Professional Summary 3) Skills 4) Work Experience 5) Education 6) Projects (if provided) 7) Certifications (if provided). Each section must be clearly labeled. For Work Experience, list each role with: Job Title, Company, Duration, and bullet points for responsibilities. Output in clean plain text with clear section separators.';
+  'You are a professional resume writer. Generate a resume using ONLY the data provided below. Do NOT add fictional data, do NOT remove any provided data. Structure the resume with these exact sections in order: 1) Contact Information 2) Professional Summary 3) Skills 4) Work Experience 5) Education 6) Projects (if provided) 7) Certifications (if provided). Each section must be clearly labeled. Omit any section that has no data (especially Work Experience). For Work Experience, list each role with: Job Title, Company, Duration, and bullet points for responsibilities. For Projects, each project MUST be a separate entry and MUST use this shape: first line Project Name (optionally with "Demo/Source" links), second line pipe-separated tech stack, then bullet points. Never merge multiple projects into one paragraph. Output in clean plain text with clear section separators.';
 
 let geminiModelCache = null;
 
@@ -218,25 +218,24 @@ function renderStructuredResumeText(structuredResume = {}) {
   lines.push('------');
   lines.push(data.skills.length ? data.skills.join(', ') : 'N/A');
   lines.push('');
-
-  lines.push('Work Experience');
-  lines.push('---------------');
-  if (data.experience.length) {
+  const hasExperience = data.experience.some(
+    (item) => item.title || item.company || item.duration || normalizeText(item.description)
+  );
+  if (hasExperience) {
+    lines.push('Work Experience');
+    lines.push('---------------');
     data.experience.forEach((item) => {
       lines.push(`Job Title: ${item.title || 'N/A'}`);
       lines.push(`Company: ${item.company || 'N/A'}`);
       lines.push(`Duration: ${item.duration || 'N/A'}`);
       const bullets = normalizeText(item.description).split('\n').map((line) => line.trim()).filter(Boolean);
       if (bullets.length) {
-        bullets.forEach((bullet) => lines.push(`- ${bullet.replace(/^[-*•]\s*/, '')}`));
+        bullets.forEach((bullet) => lines.push(`- ${bullet.replace(/^[-*\u2022]\s*/, '')}`));
       } else {
         lines.push('- N/A');
       }
       lines.push('');
     });
-  } else {
-    lines.push('N/A');
-    lines.push('');
   }
 
   lines.push('Education');
@@ -257,8 +256,13 @@ function renderStructuredResumeText(structuredResume = {}) {
     lines.push('--------');
     data.projects.forEach((item) => {
       lines.push(item.name || 'Project');
-      if (item.techStack) lines.push(`Tech Stack: ${item.techStack}`);
-      lines.push(item.description || 'N/A');
+      lines.push(item.techStack || 'N/A');
+      const bullets = normalizeText(item.description).split('\n').map((line) => line.trim()).filter(Boolean);
+      if (bullets.length) {
+        bullets.forEach((bullet) => lines.push(`- ${bullet.replace(/^[-*]\s*/, '')}`));
+      } else {
+        lines.push('- N/A');
+      }
       lines.push('');
     });
   }
@@ -428,7 +432,7 @@ async function runGeminiGenerate(structuredResume, jobDescription, options = {})
   const merged = mergeStructuredResume(structuredResume, parsedFromOutput);
 
   return {
-    optimizedResume: output,
+    optimizedResume: renderStructuredResumeText(merged),
     structuredResume: merged,
   };
 }
@@ -475,3 +479,4 @@ module.exports = {
   renderStructuredResumeText,
   mergeStructuredResume,
 };
+

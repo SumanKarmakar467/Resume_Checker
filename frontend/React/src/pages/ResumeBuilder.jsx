@@ -164,9 +164,9 @@ async function exportNodeAsPdf(node, fileName) {
   if (!node) return;
 
   const canvas = await html2canvas(node, {
-    scale: 2,
+    scale: 1.8,
     useCORS: true,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#ffffff",
   });
 
   const pdf = new jsPDF("p", "pt", "a4");
@@ -175,42 +175,13 @@ async function exportNodeAsPdf(node, fileName) {
   const margin = 20;
   const printableWidth = pageWidth - margin * 2;
   const printableHeight = pageHeight - margin * 2;
-  const scaleRatio = printableWidth / canvas.width;
-  const pageSliceHeightPx = Math.max(1, Math.floor(printableHeight / scaleRatio));
-
-  let sourceY = 0;
-  let pageIndex = 0;
-
-  while (sourceY < canvas.height) {
-    const sliceHeight = Math.min(pageSliceHeightPx, canvas.height - sourceY);
-    const sliceCanvas = document.createElement("canvas");
-    sliceCanvas.width = canvas.width;
-    sliceCanvas.height = sliceHeight;
-    const context = sliceCanvas.getContext("2d");
-    if (!context) break;
-
-    context.fillStyle = "#f5f5f5";
-    context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-    context.drawImage(
-      canvas,
-      0,
-      sourceY,
-      canvas.width,
-      sliceHeight,
-      0,
-      0,
-      canvas.width,
-      sliceHeight
-    );
-
-    const pageImage = sliceCanvas.toDataURL("image/png");
-    if (pageIndex > 0) pdf.addPage("a4", "p");
-    const renderHeight = sliceHeight * scaleRatio;
-    pdf.addImage(pageImage, "PNG", margin, margin, printableWidth, renderHeight, undefined, "FAST");
-
-    sourceY += sliceHeight;
-    pageIndex += 1;
-  }
+  const fitRatio = Math.min(printableWidth / canvas.width, printableHeight / canvas.height);
+  const renderWidth = canvas.width * fitRatio;
+  const renderHeight = canvas.height * fitRatio;
+  const offsetX = margin + (printableWidth - renderWidth) / 2;
+  const offsetY = margin + (printableHeight - renderHeight) / 2;
+  const image = canvas.toDataURL("image/png");
+  pdf.addImage(image, "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
@@ -237,6 +208,9 @@ function SectionTitle({ label, color }) {
 
 function ResumeTemplateBase({ theme, data }) {
   const safe = sanitizeStructuredData(data);
+  const hasExperience = safe.experience.some(
+    (item) => item.title || item.company || item.duration || String(item.description || "").trim()
+  );
 
   if (theme.split) {
     return (
@@ -246,13 +220,12 @@ function ResumeTemplateBase({ theme, data }) {
           border: `1px solid ${theme.border}`,
           borderRadius: 8,
           color: "#1a1a1a",
-          fontSize: 11,
-          lineHeight: 1.6,
-          padding: 14,
-          minHeight: 860,
+          fontSize: 10.5,
+          lineHeight: 1.4,
+          padding: 12,
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "0.33fr 0.67fr", minHeight: 830 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "0.33fr 0.67fr" }}>
           <div
             style={{
               background: "#1e293b",
@@ -269,7 +242,7 @@ function ResumeTemplateBase({ theme, data }) {
             {safe.github ? <div style={{ fontSize: 10 }}>{safe.github}</div> : null}
 
             <SectionTitle label="Skills" color="#ffffff" />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "flex-start" }}>
               {safe.skills.length
                 ? safe.skills.map((skill) => (
                     <span
@@ -277,10 +250,15 @@ function ResumeTemplateBase({ theme, data }) {
                       style={{
                         border: "1px solid rgba(255,255,255,0.45)",
                         borderRadius: 999,
-                        fontSize: 9,
-                        padding: "2px 8px",
+                        fontSize: 8.5,
+                        padding: "2px 7px",
                         color: "#ffffff",
                         background: "rgba(255,255,255,0.12)",
+                        display: "inline-block",
+                        maxWidth: "100%",
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word",
                       }}
                     >
                       {skill}
@@ -294,16 +272,18 @@ function ResumeTemplateBase({ theme, data }) {
             <SectionTitle label="Professional Summary" color={theme.heading} />
             <div>{safe.summary || "Add a concise summary for your profile."}</div>
 
-            <SectionTitle label="Work Experience" color={theme.heading} />
-            {safe.experience.map((item, index) => (
-              <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
-                <div style={{ fontWeight: 700 }}>{item.title || "Role"}</div>
-                <div style={{ color: "#334155", fontSize: 10.5 }}>
-                  {[item.company, item.duration].filter(Boolean).join(" | ")}
-                </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{item.description || "No description provided."}</div>
-              </div>
-            ))}
+            {hasExperience ? <SectionTitle label="Work Experience" color={theme.heading} /> : null}
+            {hasExperience
+              ? safe.experience.map((item, index) => (
+                  <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700 }}>{item.title || "Role"}</div>
+                    <div style={{ color: "#334155", fontSize: 10.5 }}>
+                      {[item.company, item.duration].filter(Boolean).join(" | ")}
+                    </div>
+                    <div style={{ whiteSpace: "pre-wrap" }}>{item.description || "No description provided."}</div>
+                  </div>
+                ))
+              : null}
 
             <SectionTitle label="Education" color={theme.heading} />
             {safe.education.map((item, index) => (
@@ -318,8 +298,15 @@ function ResumeTemplateBase({ theme, data }) {
             {safe.projects.map((item, index) => (
               <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
                 <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
-                {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>Tech: {item.techStack}</div> : null}
-                <div>{item.description || "No description provided."}</div>
+                {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>{item.techStack}</div> : null}
+                {(String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean).length
+                  ? String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean)
+                  : ["No description provided."]
+                ).map((line, bulletIndex) => (
+                  <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
+                    • {line.replace(/^[-*•]\s*/, "")}
+                  </div>
+                ))}
               </div>
             ))}
 
@@ -340,12 +327,11 @@ function ResumeTemplateBase({ theme, data }) {
         border: `1px solid ${theme.border}`,
         borderRadius: 8,
         color: "#1a1a1a",
-        fontSize: 11,
-        lineHeight: 1.6,
-        padding: 14,
-        minHeight: 860,
-      }}
-    >
+          fontSize: 10.5,
+          lineHeight: 1.4,
+          padding: 12,
+        }}
+      >
       <div style={{ borderBottom: `2px solid ${theme.accent}`, paddingBottom: 8 }}>
         <div style={{ fontSize: 24, fontWeight: 800, color: theme.heading }}>{safe.name || "Your Name"}</div>
         <div style={{ fontSize: 10.5, color: "#334155", marginTop: 4 }}>
@@ -357,7 +343,7 @@ function ResumeTemplateBase({ theme, data }) {
       <div>{safe.summary || "Add a concise summary for your profile."}</div>
 
       <SectionTitle label="Skills" color={theme.heading} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "flex-start" }}>
         {safe.skills.length
           ? safe.skills.map((skill) => (
               <span
@@ -367,8 +353,13 @@ function ResumeTemplateBase({ theme, data }) {
                   borderRadius: 999,
                   background: "#f8fafc",
                   color: "#1a1a1a",
-                  fontSize: 10,
-                  padding: "2px 9px",
+                  fontSize: 8.8,
+                  padding: "2px 7px",
+                  display: "inline-block",
+                  maxWidth: "100%",
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
               >
                 {skill}
@@ -377,16 +368,18 @@ function ResumeTemplateBase({ theme, data }) {
           : <span style={{ color: "#64748b", fontSize: 10.5 }}>No skills added</span>}
       </div>
 
-      <SectionTitle label="Work Experience" color={theme.heading} />
-      {safe.experience.map((item, index) => (
-        <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
-          <div style={{ fontWeight: 700, color: "#1a1a1a" }}>{item.title || "Role"}</div>
-          <div style={{ fontSize: 10.5, color: "#334155" }}>
-            {[item.company, item.duration].filter(Boolean).join(" | ")}
-          </div>
-          <div style={{ whiteSpace: "pre-wrap", color: "#1f2937" }}>{item.description || "No description provided."}</div>
-        </div>
-      ))}
+      {hasExperience ? <SectionTitle label="Work Experience" color={theme.heading} /> : null}
+      {hasExperience
+        ? safe.experience.map((item, index) => (
+            <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, color: "#1a1a1a" }}>{item.title || "Role"}</div>
+              <div style={{ fontSize: 10.5, color: "#334155" }}>
+                {[item.company, item.duration].filter(Boolean).join(" | ")}
+              </div>
+              <div style={{ whiteSpace: "pre-wrap", color: "#1f2937" }}>{item.description || "No description provided."}</div>
+            </div>
+          ))
+        : null}
 
       <SectionTitle label="Education" color={theme.heading} />
       {safe.education.map((item, index) => (
@@ -401,8 +394,15 @@ function ResumeTemplateBase({ theme, data }) {
       {safe.projects.map((item, index) => (
         <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
           <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
-          {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>Tech: {item.techStack}</div> : null}
-          <div style={{ color: "#1f2937" }}>{item.description || "No description provided."}</div>
+          {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>{item.techStack}</div> : null}
+          {(String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean).length
+            ? String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean)
+            : ["No description provided."]
+          ).map((line, bulletIndex) => (
+            <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
+              • {line.replace(/^[-*•]\s*/, "")}
+            </div>
+          ))}
         </div>
       ))}
 

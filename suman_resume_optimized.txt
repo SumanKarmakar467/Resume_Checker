@@ -1,0 +1,52 @@
+SUMAN KARMAKAR
+MERN Stack Developer
+Kolkata, West Bengal, India
+Email: karmakarsuman12138@gmail.com | Phone: +91-XXXXXXXXXX
+LinkedIn: linkedin.com/in/sumankarmakar467
+GitHub: github.com/SumanKarmakar467
+
+PROFESSIONAL SUMMARY
+Final-year B.Tech Computer Science student and MERN Stack Developer with hands-on experience building and deploying full-stack web applications. Proficient in React.js, Node.js, Express.js, and MongoDB with strong foundations in Data Structures and Algorithms (Java). Experienced in building responsive user interfaces, designing REST APIs, and deploying projects with Git-based workflows. Seeking an entry-level Software Engineer role to build scalable, user-focused products.
+
+TECHNICAL SKILLS
+Languages: Java, JavaScript (ES6+), HTML5, CSS3
+Frontend: React.js, Responsive UI Design, Component Architecture, Vite
+Backend: Node.js, Express.js, REST API Development
+Database: MongoDB, Mongoose ODM
+Core CS: Data Structures and Algorithms, OOP, Problem Solving
+Tools and Platforms: Git, GitHub, Postman, VS Code, Vercel, Render, GitHub Pages
+Languages Spoken: English, Hindi, Bengali
+
+PROJECTS
+ATS Resume Checker | React.js, Node.js, Express.js, MongoDB, Gemini API
+- Built a full-stack ATS resume checker that accepts PDF, DOCX, and TXT files for analysis.
+- Implemented resume scoring, keyword-gap detection, and improvement suggestions against job descriptions.
+- Added a guided resume builder with structured sections and ATS-friendly downloadable output.
+- Designed backend APIs for analyze, generate, and history flows, and integrated frontend with robust error handling.
+
+LeetCode Metrics Tracker | React.js, REST API, Vercel
+- Developed a coding analytics dashboard that fetches and displays live LeetCode profile metrics.
+- Built reusable React components and dynamic rendering for solved counts and profile statistics.
+- Deployed on Vercel with GitHub workflow and optimized API handling for fast UI response.
+
+Bella Vista Restaurant Website | HTML5, CSS3, JavaScript, Vercel
+- Created a fully responsive restaurant website with menu, business details, and smooth navigation.
+- Applied modern UI/UX layout practices to improve readability and cross-device consistency.
+- Managed complete deployment lifecycle using Git and Vercel.
+
+Personal Portfolio Website | HTML5, CSS3, JavaScript, GitHub Pages
+- Designed and deployed a portfolio website to present projects, skills, and profile details.
+- Used semantic HTML and clean structure to improve accessibility and SEO.
+
+EDUCATION
+Greater Kolkata College of Engineering and Management, Kolkata, West Bengal
+Bachelor of Technology (B.Tech), Computer Science and Engineering
+Aug 2022 - May 2026
+
+R.B.B. High (H.S) School, West Bengal
+Class XII (WBCHSE): 88.60%
+2021 - 2022
+
+ACHIEVEMENTS
+- Active LeetCode problem solver focused on Arrays, Trees, Graphs, Dynamic Programming, and Recursion.
+- Built practical full-stack projects and deployed them publicly using modern web tooling.

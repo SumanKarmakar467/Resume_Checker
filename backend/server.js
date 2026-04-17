@@ -27,6 +27,15 @@ const allowedOrigins = parseAllowedOrigins(
   process.env.FRONTEND_URL || 'http://localhost:5173,https://resume-checker-alpha-two.vercel.app'
 );
 
+function isLocalDevOrigin(origin) {
+  try {
+    const parsed = new URL(origin);
+    return ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+  } catch (_error) {
+    return false;
+  }
+}
+
 function getMongoReadyStateLabel() {
   const labels = {
     0: 'disconnected',
@@ -40,7 +49,7 @@ function getMongoReadyStateLabel() {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`));

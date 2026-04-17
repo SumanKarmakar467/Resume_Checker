@@ -6,6 +6,7 @@ const PHONE_REGEX = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-
 const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const DATE_RANGE_REGEX =
   /((?:19|20)\d{2}\s*(?:-|to)\s*(?:present|current|now|(?:19|20)\d{2}))|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(?:19|20)\d{2}\s*(?:-|to)\s*(?:present|current|now|(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(?:19|20)\d{2})))/i;
+const BULLET_PREFIX_REGEX = /^(?:[\u2022\u25CF\u25AA\u25E6\u00B7*\u25A0\u25C6\u25B6\u25BA-])+\s*/;
 
 function normalizeText(text = '') {
   return String(text || '')
@@ -100,7 +101,7 @@ function toUniqueList(items = [], max = 40) {
   const output = [];
 
   for (const item of items) {
-    const value = cleanLine(item).replace(/^[-*•]\s*/, '');
+    const value = cleanLine(item).replace(BULLET_PREFIX_REGEX, '');
     if (!value) continue;
     const key = value.toLowerCase();
     if (seen.has(key)) continue;
@@ -113,6 +114,18 @@ function toUniqueList(items = [], max = 40) {
 }
 
 function parseName(contactLines = [], fullText = '') {
+  const cleanCandidateName = (value = '') => {
+    const normalized = cleanLine(value).replace(/([a-z])([A-Z])/g, '$1 $2');
+    const words = normalized.split(/\s+/).filter(Boolean);
+    const roleStart = words.findIndex((word) =>
+      /^(mern|full-stack|fullstack|software|frontend|backend|developer|engineer|intern)$/i.test(word)
+    );
+    if (roleStart >= 2) {
+      return words.slice(0, roleStart).join(' ');
+    }
+    return normalized;
+  };
+
   const candidateFromContact = contactLines.find((line) => {
     const value = cleanLine(line);
     if (!value) return false;
@@ -121,11 +134,11 @@ function parseName(contactLines = [], fullText = '') {
     return /^[A-Za-z][A-Za-z .'-]{1,70}$/.test(value);
   });
 
-  if (candidateFromContact) return candidateFromContact;
+  if (candidateFromContact) return cleanCandidateName(candidateFromContact);
 
   const firstLine = cleanLine(normalizeText(fullText).split('\n')[0] || '');
   if (/^[A-Za-z][A-Za-z .'-]{1,70}$/.test(firstLine)) {
-    return firstLine;
+    return cleanCandidateName(firstLine);
   }
   return '';
 }
@@ -143,8 +156,8 @@ function parseSummary(summaryLines = [], fullText = '') {
 
 function splitSkillTokens(value = '') {
   return String(value || '')
-    .replace(/^[-*•]\s*/, '')
-    .split(/,|\/|\||;|•/)
+    .replace(BULLET_PREFIX_REGEX, '')
+    .split(/,|\/|\||;|\u2022|\u25CF|\u25AA|\u00B7/)
     .map((token) => cleanLine(token))
     .filter((token) => token && token.length <= 48);
 }
@@ -152,7 +165,13 @@ function splitSkillTokens(value = '') {
 function parseSkills(skillLines = []) {
   const tokens = [];
   for (const line of skillLines) {
-    const normalized = cleanLine(line).replace(/^skills?\s*:/i, '');
+    const normalized = cleanLine(line)
+      .replace(/^(?:skills?)\s*:/i, '')
+      .replace(
+        /\b(Languages|Frontend|Backend|Database|Core CS|Tools\s*&\s*Platforms|Languages Spoken)(?=[A-Za-z])/gi,
+        '$1: '
+      )
+      .replace(/^(?:Languages|Frontend|Backend|Database|Core CS|Tools\s*&\s*Platforms|Languages Spoken)\s*:\s*/i, '');
     tokens.push(...splitSkillTokens(normalized));
   }
   return toUniqueList(tokens, 60);
@@ -183,7 +202,7 @@ function parseExperience(experienceLines = []) {
   const items = [];
 
   for (const paragraph of paragraphs) {
-    const lines = paragraph.map((line) => line.replace(/^[-*•]\s*/, '')).filter(Boolean);
+    const lines = paragraph.map((line) => line.replace(BULLET_PREFIX_REGEX, '')).filter(Boolean);
     if (!lines.length) continue;
 
     const header = lines[0];
@@ -200,7 +219,7 @@ function parseExperience(experienceLines = []) {
       title = parts[0] || '';
       company = parts[1] || '';
     } else {
-      const dashSplit = header.split(/\s(?:-|–|—)\s/).map(cleanLine).filter(Boolean);
+      const dashSplit = header.split(/\s(?:-|\u2013|\u2014)\s/).map(cleanLine).filter(Boolean);
       title = dashSplit[0] || header;
       company = dashSplit[1] || '';
     }
@@ -222,78 +241,182 @@ function parseExperience(experienceLines = []) {
 }
 
 function parseEducation(educationLines = []) {
-  const paragraphs = splitParagraphs(educationLines);
-  const items = [];
   const degreeRegex =
-    /(b\.?tech|bachelor|m\.?tech|master|b\.?e|m\.?e|bsc|msc|bca|mca|phd|diploma|high school|h\.?s)/i;
-  const yearRegex = /(19|20)\d{2}(?:\s*-\s*(?:19|20)\d{2}|(?:\s*-\s*present))?/i;
+    /\b(b\.?\s?tech|bachelor(?:\s+of\s+technology)?|m\.?\s?tech|master|b\.?\s?e|m\.?\s?e|bsc|msc|bca|mca|phd|diploma|class\s*xii|class\s*x\b|10th|12th|higher\s+secondary|secondary|ssc|hsc)\b/i;
+  const yearRegex = /((?:19|20)\d{2}\s*[-\u2013\u2014]\s*(?:19|20)\d{2})|((?:19|20)\d{2})/i;
+  const institutionRegex = /\b(college|school|university|institute|academy|management|polytechnic)\b/i;
+  const detailRegex = /\b(class\s*x|class\s*xii|10th|12th|b\.?\s?tech|bachelor|master|m\.?\s?tech|diploma|ssc|hsc|wbbse|wbchse)\b|((?:19|20)\d{2})/i;
 
-  for (const paragraph of paragraphs) {
-    const text = paragraph.join(' | ');
-    const degree = pickFirstMatch(text, degreeRegex);
-    const year = pickFirstMatch(text, yearRegex);
-    const first = paragraph[0] || '';
-    const parts = first.split('|').map(cleanLine).filter(Boolean);
+  const normalizeDegree = (value = '') => {
+    const raw = cleanLine(value).toLowerCase();
+    if (!raw) return '';
+    if (/(b\.?\s?tech|bachelor)/i.test(raw)) return 'B.Tech';
+    if (/(m\.?\s?tech|master)/i.test(raw)) return 'M.Tech';
+    if (/(class\s*xii|12th|higher\s+secondary|hsc|h\.?s)/i.test(raw)) return 'Class XII';
+    if (/(class\s*x\b|10th|secondary|ssc)/i.test(raw)) return 'Class X';
+    return cleanLine(value);
+  };
 
-    let institution = parts[0] || first;
-    if (degree) institution = institution.replace(new RegExp(degree, 'i'), '').trim();
-    if (year) institution = institution.replace(new RegExp(year, 'i'), '').trim();
-    institution = institution.replace(/[,-]+$/g, '').trim();
+  const lines = educationLines
+    .map((line) => cleanLine(String(line || '').replace(BULLET_PREFIX_REGEX, '').replace(/([a-z])([A-Z])/g, '$1 $2')))
+    .filter((line) => line && !/^education$/i.test(line));
 
-    const normalizedDegree = degree || parts[1] || '';
-    const normalizedYear = year || parts[2] || '';
+  const rows = [];
+  const buildRow = (institutionPart = '', detailPart = '') => {
+    const joined = cleanLine([institutionPart, detailPart].filter(Boolean).join(' '));
+    const degree = normalizeDegree(pickFirstMatch(detailPart || joined, degreeRegex));
+    const year = pickFirstMatch(joined, yearRegex);
+    const institution = cleanLine(institutionPart)
+      .replace(/[|]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[,-]+$/g, '')
+      .trim();
 
-    if (institution || normalizedDegree || normalizedYear) {
-      items.push({
-        degree: normalizedDegree,
-        institution,
-        year: normalizedYear,
-      });
+    if (!institution && !degree && !year) return null;
+    return { degree, institution, year: cleanLine(year) };
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index];
+    const next = lines[index + 1] || '';
+
+    if (institutionRegex.test(current) && detailRegex.test(next)) {
+      const row = buildRow(current, next);
+      if (row) rows.push(row);
+      index += 1;
+      continue;
     }
+
+    if (detailRegex.test(current) && rows.length) {
+      const previous = rows[rows.length - 1];
+      if (!previous.degree) previous.degree = normalizeDegree(pickFirstMatch(current, degreeRegex));
+      if (!previous.year) previous.year = cleanLine(pickFirstMatch(current, yearRegex));
+      continue;
+    }
+
+    const row = buildRow(current, '');
+    if (row) rows.push(row);
   }
 
-  return items;
+  const deduped = [];
+  for (const row of rows) {
+    const degree = cleanLine(row.degree);
+    const institution = cleanLine(row.institution);
+    const year = cleanLine(row.year);
+    if (!degree && !institution && !year) continue;
+
+    const key = `${degree.toLowerCase()}|${institution.toLowerCase()}`;
+    const existing = deduped.find((item) => `${item.degree.toLowerCase()}|${item.institution.toLowerCase()}` === key);
+    if (existing) {
+      if (!existing.year && year) existing.year = year;
+      continue;
+    }
+    deduped.push({ degree, institution, year });
+  }
+
+  return deduped;
 }
 
 function parseCertifications(certificationLines = []) {
   return toUniqueList(
     certificationLines.map((line) =>
-      cleanLine(String(line || '').replace(/^[-*•]\s*/, '').replace(/^(certification|certificate)\s*:/i, ''))
+      cleanLine(String(line || '').replace(BULLET_PREFIX_REGEX, '').replace(/^(certification|certificate)\s*:/i, ''))
     ),
     40
   );
 }
 
 function parseProjects(projectLines = []) {
-  const paragraphs = splitParagraphs(projectLines);
-  const items = [];
+  const lines = projectLines.map((raw) => String(raw || '').trim()).filter(Boolean);
+  if (!lines.length) return [];
 
-  for (const paragraph of paragraphs) {
-    const lines = paragraph.map((line) => line.replace(/^[-*•]\s*/, '')).filter(Boolean);
-    if (!lines.length) continue;
+  const isLikelyProjectHeader = (line = '') => {
+    const clean = cleanLine(line);
+    if (!clean) return false;
+    if (/demo/i.test(clean) && /source/i.test(clean)) return true;
+    if (/[-\u2014]\s*(full[-\s]?stack|project|website|platform|tracker)/i.test(clean)) return true;
+    return false;
+  };
 
-    const firstLine = lines[0];
-    const techStackMatch = lines.join(' ').match(/(?:tech stack|technologies|stack)\s*:\s*([^|]+)$/i);
-    const techStack = techStackMatch ? cleanLine(techStackMatch[1]) : '';
+  const isLikelyTechStack = (line = '') => {
+    const clean = cleanLine(line);
+    return clean.includes('|') && !/[.!?]$/.test(clean);
+  };
 
-    let name = firstLine;
-    if (name.includes('|')) {
-      name = cleanLine(name.split('|')[0] || '');
-    }
-    name = cleanLine(name.replace(/^(project)\s*:/i, ''));
+  const projects = [];
+  let current = null;
+  let pendingBullet = false;
+  let currentBullet = '';
 
-    const description = cleanLine(lines.slice(1).join(' '));
+  const flushBullet = () => {
+    if (!current || !currentBullet) return;
+    current.bullets.push(cleanLine(currentBullet));
+    currentBullet = '';
+  };
 
-    if (name || description || techStack) {
-      items.push({
-        name,
+  const flushCurrent = () => {
+    if (!current) return;
+    flushBullet();
+    const description = current.bullets.join('\n').trim();
+    if (current.name || description || current.techStack) {
+      projects.push({
+        name: cleanLine(current.name),
+        techStack: cleanLine(current.techStack),
         description,
-        techStack,
       });
+    }
+    current = null;
+    pendingBullet = false;
+  };
+
+  for (const rawLine of lines) {
+    const line = cleanLine(rawLine);
+    if (!line) continue;
+
+    if (isLikelyProjectHeader(line)) {
+      flushCurrent();
+      current = { name: line, techStack: '', bullets: [] };
+      continue;
+    }
+
+    if (!current) {
+      current = { name: line, techStack: '', bullets: [] };
+      continue;
+    }
+
+    if (!current.techStack && isLikelyTechStack(line)) {
+      current.techStack = line;
+      continue;
+    }
+
+    if (BULLET_PREFIX_REGEX.test(line)) {
+      flushBullet();
+      const bulletText = line.replace(BULLET_PREFIX_REGEX, '');
+      if (bulletText) {
+        currentBullet = bulletText;
+        pendingBullet = false;
+      } else {
+        pendingBullet = true;
+      }
+      continue;
+    }
+
+    if (pendingBullet) {
+      flushBullet();
+      currentBullet = line;
+      pendingBullet = false;
+      continue;
+    }
+
+    if (currentBullet) {
+      currentBullet = [currentBullet, line].join(' ').trim();
+    } else {
+      currentBullet = line;
     }
   }
 
-  return items;
+  flushCurrent();
+  return projects;
 }
 
 function sanitizeStructuredResume(input = {}) {
@@ -409,3 +532,4 @@ module.exports = {
   parseStructuredResumeData,
   sanitizeStructuredResume,
 };
+
