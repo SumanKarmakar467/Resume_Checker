@@ -42,6 +42,91 @@ const EMPTY_STRUCTURED = {
   projects: [{ name: "", description: "", techStack: "", demoLink: "", sourceLink: "" }],
 };
 
+const PROFILE_SKILLS = [
+  "Java",
+  "JavaScript (ES6+)",
+  "HTML5",
+  "CSS3",
+  "React.js",
+  "Tailwind CSS",
+  "Responsive UI Design",
+  "Component Architecture",
+  "Vite",
+  "Node.js",
+  "Express.js",
+  "Spring Boot",
+  "REST API Development",
+  "JWT Authentication",
+  "MongoDB",
+  "Mongoose ODM",
+  "Data Structures & Algorithms",
+  "OOP",
+  "MVC Architecture",
+  "Git",
+  "GitHub",
+  "Vercel",
+  "Render",
+  "GitHub Pages",
+  "VS Code",
+];
+
+const PROFILE_EDUCATION = [
+  {
+    degree: "Bachelor of Technology in Computer Science & Engineering",
+    institution: "Greater Kolkata College of Engineering & Management, Kolkata, WB",
+    year: "Aug 2022 - May 2026",
+    percentage: "",
+  },
+  {
+    degree: "Class XII - WBCHSE",
+    institution: "R.B.B. High (H.S) School, West Bengal",
+    year: "2021 - 2022",
+    percentage: "88.60%",
+  },
+  {
+    degree: "Class X - WBBSE",
+    institution: "R.B.B. High (H.S) School, West Bengal",
+    year: "2019 - 2020",
+    percentage: "70.57%",
+  },
+];
+
+const PROFILE_PROJECTS = [
+  {
+    name: "ATS Resume Checker",
+    techStack: "React.js | Spring Boot | Java | REST API | Vercel",
+    demoLink: "",
+    sourceLink: "",
+    description: `Built a full-stack ATS resume analysis tool with React.js frontend and Spring Boot (Java) backend; users upload PDF/DOCX/TXT resumes and receive real-time compatibility scores with optional job-description matching.
+Designed REST endpoints /analyze and /generate-ats with multipart upload; implemented ResumeParser and ResumeAnalysisService in Java to evaluate keyword density and formatting quality.
+Deployed frontend on Vercel; managed structured monorepo with Git and GitHub version control.`,
+  },
+  {
+    name: "GymForge - Full-Stack Fitness Platform",
+    techStack: "MongoDB | Express.js | React.js | Node.js | Tailwind CSS | JWT | Vercel | Render",
+    demoLink: "",
+    sourceLink: "",
+    description: `Developed a complete MERN-stack fitness app featuring JWT authentication, AI-generated workout plans, To-Do tracker, and dynamic wallpaper generator across multiple protected React pages.
+Architected a RESTful Node.js/Express backend with MongoDB/Mongoose models (User, WorkoutPlan, TodoItem); deployed backend on Render, frontend on Vercel with proper CORS configuration.
+Implemented custom React hooks (useAuth, useTodos, useWorkoutPlan) and context-based auth system with fully protected client-side routing.`,
+  },
+  {
+    name: "LeetCode Metrics Tracker",
+    techStack: "React.js | REST API | Vercel",
+    demoLink: "",
+    sourceLink: "",
+    description: `Engineered a real-time coding analytics dashboard fetching live LeetCode user statistics including problem-solving progress and category-wise performance via public API integration.
+Designed a responsive UI with dynamic data rendering; deployed on Vercel with Git-based CI/CD achieving fast load times through optimized API call handling.`,
+  },
+  {
+    name: "Personal Portfolio Website",
+    techStack: "React.js | Tailwind CSS | JavaScript | Vite | Vercel",
+    demoLink: "",
+    sourceLink: "",
+    description: `Designed and deployed a fully responsive portfolio showcasing projects, skills, and professional profile; hosted on GitHub Pages with semantic HTML for strong SEO and accessibility compliance.`,
+  },
+];
+
 const RESUME_TEMPLATES = [
   { id: "ats_clean", name: "Classic Professional", description: "Single-column ATS-safe layout.", atsScore: 96, photoIncluded: false },
   { id: "modern_split", name: "Modern Sidebar", description: "Two-column layout with focused sidebar.", atsScore: 94, photoIncluded: false },
@@ -150,6 +235,16 @@ function sanitizeStructuredData(data = {}) {
     education: education.length ? education : [{ degree: "", institution: "", year: "", percentage: "" }],
     certifications: certifications.length ? certifications : [""],
     projects: projects.length ? projects : [{ name: "", description: "", techStack: "", demoLink: "", sourceLink: "" }],
+  };
+}
+
+function applyRequestedSectionPreset(data = {}) {
+  const safe = data && typeof data === "object" ? data : {};
+  return {
+    ...safe,
+    skills: [...PROFILE_SKILLS],
+    education: PROFILE_EDUCATION.map((item) => ({ ...item })),
+    projects: PROFILE_PROJECTS.map((item) => ({ ...item })),
   };
 }
 
@@ -273,7 +368,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
   writeSection("Professional Summary");
   writeWrapped(safe.summary || "Add a concise summary for your profile.");
 
-  writeSection("Skills");
+  writeSection("Technical Skills");
   skillLines.forEach((line) => writeWrapped(line));
 
   if (hasExperience) {
@@ -382,10 +477,12 @@ function extractEducationPercentage(item = {}) {
 
 function splitSkillsIntoGroups(skills = []) {
   const groups = {
+    languages: [],
     frontend: [],
     backend: [],
     database: [],
-    aiTools: [],
+    coreCs: [],
+    toolsPlatforms: [],
     other: [],
   };
 
@@ -393,20 +490,28 @@ function splitSkillsIntoGroups(skills = []) {
     const value = cleanValue(skill);
     if (!value) return;
     const key = value.toLowerCase();
-    if (/(html|css|javascript|js|typescript|react|angular|vue|tailwind|bootstrap|vite|next\.?js|responsive)/.test(key)) {
+    if (/(^java$|javascript|html|css)/.test(key)) {
+      groups.languages.push(value);
+      return;
+    }
+    if (/(react|tailwind|responsive|component architecture|vite|frontend|ui design|angular|vue|next\.?js)/.test(key)) {
       groups.frontend.push(value);
       return;
     }
-    if (/(node|express|spring|java|python|django|flask|rest|api|jwt|auth|mvc|oop)/.test(key)) {
+    if (/(node|express|spring|backend|rest|api|jwt|auth)/.test(key)) {
       groups.backend.push(value);
       return;
     }
-    if (/(mongo|mongodb|firebase|vercel|sql|postgres|mysql|redis|sqlite|supabase)/.test(key)) {
+    if (/(mongo|mongoose|sql|postgres|mysql|redis|database|odm)/.test(key)) {
       groups.database.push(value);
       return;
     }
-    if (/(codex|chatgpt|claude|openai|llm|gemini|copilot)/.test(key)) {
-      groups.aiTools.push(value);
+    if (/(data structures|algorithms|oop|object oriented|mvc|architecture|core cs)/.test(key)) {
+      groups.coreCs.push(value);
+      return;
+    }
+    if (/(git|github|vercel|render|pages|vs code|tools|platform)/.test(key)) {
+      groups.toolsPlatforms.push(value);
       return;
     }
     groups.other.push(value);
@@ -414,10 +519,12 @@ function splitSkillsIntoGroups(skills = []) {
 
   const unique = (list) => [...new Set(list)];
   return {
+    languages: unique(groups.languages),
     frontend: unique(groups.frontend),
     backend: unique(groups.backend),
     database: unique(groups.database),
-    aiTools: unique(groups.aiTools),
+    coreCs: unique(groups.coreCs),
+    toolsPlatforms: unique(groups.toolsPlatforms),
     other: unique(groups.other),
   };
 }
@@ -425,18 +532,22 @@ function splitSkillsIntoGroups(skills = []) {
 function buildSkillsLines(skills = []) {
   const grouped = splitSkillsIntoGroups(skills);
   const lines = [];
-  if (grouped.frontend.length) lines.push(`Frontend - ${grouped.frontend.join(", ")}`);
-  if (grouped.backend.length) lines.push(`Backend - ${grouped.backend.join(", ")}`);
-  if (grouped.database.length) lines.push(`Database - ${grouped.database.join(", ")}`);
-  if (grouped.aiTools.length) lines.push(`AI Tools - ${grouped.aiTools.join(", ")}`);
-  if (grouped.other.length) lines.push(`Other - ${grouped.other.join(", ")}`);
+  if (grouped.languages.length) lines.push(`Languages ${grouped.languages.join(", ")}`);
+  if (grouped.frontend.length) lines.push(`Frontend ${grouped.frontend.join(", ")}`);
+  if (grouped.backend.length) lines.push(`Backend ${grouped.backend.join(", ")}`);
+  if (grouped.database.length) lines.push(`Database ${grouped.database.join(", ")}`);
+  if (grouped.coreCs.length) lines.push(`Core CS ${grouped.coreCs.join(", ")}`);
+  if (grouped.toolsPlatforms.length) lines.push(`Tools & Platforms ${grouped.toolsPlatforms.join(", ")}`);
+  if (grouped.other.length) lines.push(`Other ${grouped.other.join(", ")}`);
 
   if (!lines.length) {
     return [
-      "Frontend - HTML, CSS, JS",
-      "Backend - Node.js, Express.js",
-      "Database - Vercel, MongoDB, Firebase",
-      "AI Tools - Codex, ChatGPT, Claude",
+      "Languages Java, JavaScript (ES6+), HTML5, CSS3",
+      "Frontend React.js, Tailwind CSS, Responsive UI Design, Component Architecture, Vite",
+      "Backend Node.js, Express.js, Spring Boot, REST API Development, JWT Authentication",
+      "Database MongoDB, Mongoose ODM",
+      "Core CS Data Structures & Algorithms, OOP, MVC Architecture",
+      "Tools & Platforms Git, GitHub, Vercel, Render, GitHub Pages, VS Code",
     ];
   }
   return lines;
@@ -451,9 +562,9 @@ function clampText(value, max = 110) {
 function getProjectBulletPoints(description) {
   const lines = String(description || "")
     .split("\n")
-    .map((line) => line.replace(/^[-*â€¢]\s*/, "").trim())
+    .map((line) => line.replace(/^[-*]\s*/, "").trim())
     .filter(Boolean);
-  const points = lines.slice(0, 3).map((line) => clampText(line, 108)).filter(Boolean);
+  const points = lines.slice(0, 3).map((line) => cleanText(line)).filter(Boolean);
   return points.length ? points : ["Built and delivered a complete solution."];
 }
 
@@ -535,7 +646,7 @@ function ResumeTemplateBase({ theme, data }) {
               </div>
             ) : null}
 
-            <SectionTitle label="Skills" color="#ffffff" />
+            <SectionTitle label="Technical Skills" color="#ffffff" />
             <div style={{ display: "grid", gap: 3 }}>
               {skillLines.map((line) => (
                 <div key={line} style={{ fontSize: 9.3, lineHeight: 1.35, color: "rgba(255,255,255,0.95)" }}>
@@ -650,7 +761,7 @@ function ResumeTemplateBase({ theme, data }) {
       <SectionTitle label="Professional Summary" color={theme.heading} />
       <div>{safe.summary || "Add a concise summary for your profile."}</div>
 
-      <SectionTitle label="Skills" color={theme.heading} />
+      <SectionTitle label="Technical Skills" color={theme.heading} />
       <div style={{ display: "grid", gap: 4 }}>
         {skillLines.map((line) => (
           <div key={line} style={{ color: "#1f2937" }}>
@@ -1047,7 +1158,7 @@ export default function ResumeBuilder({
       const payload = new FormData();
       payload.append("file", existingFile);
       const parsed = await requestParseBuilderResume(payload);
-      const structured = sanitizeStructuredData(parsed?.structuredData || {});
+      const structured = sanitizeStructuredData(applyRequestedSectionPreset(parsed?.structuredData || {}));
       setFormData(structured);
       setGeneratedStructured(null);
       setGeneratedResume("");
@@ -1079,7 +1190,9 @@ export default function ResumeBuilder({
       });
 
       setGeneratedResume(cleanText(response?.optimizedResume));
-      setGeneratedStructured(sanitizeStructuredData(response?.structuredResume || safeData));
+      setGeneratedStructured(
+        sanitizeStructuredData(applyRequestedSectionPreset(response?.structuredResume || safeData))
+      );
       setBuildId(response?.buildId || null);
       setStep(STEPS.length - 1);
 
