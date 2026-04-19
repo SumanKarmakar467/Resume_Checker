@@ -33,6 +33,7 @@ const ResumeAnalysisSchema = new mongoose.Schema({
         degree: String,
         institution: String,
         year: String,
+        percentage: String,
       },
     ],
     certifications: [String],

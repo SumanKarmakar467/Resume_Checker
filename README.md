@@ -8,7 +8,7 @@ AI-powered ATS Resume Checker built with **React + Express + MongoDB + Gemini**.
 ```text
 +--------------------+        HTTP (REST)         +-------------------------+
 | React (Vite)       |  <---------------------->  | Node.js + Express API   |
-| frontend/React     |                            | backend/server.js       |
+| frontend           |                            | backend/server.js       |
 +--------------------+                            +-----------+-------------+
                                                               |
                                                Mongoose       |
@@ -109,7 +109,7 @@ GEMINI_API_KEY=your_gemini_api_key
 GEMINI_MODEL=gemini-1.5-flash
 ```
 
-### Frontend (`frontend/React/.env`)
+### Frontend (`frontend/.env`)
 
 ```bash
 VITE_API_URL=http://localhost:5000
@@ -136,7 +136,7 @@ Backend runs on `http://localhost:5000`.
 ### 2. Frontend
 
 ```bash
-cd frontend/React
+cd frontend
 npm install
 npm run dev
 ```

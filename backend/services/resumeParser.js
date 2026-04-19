@@ -244,8 +244,11 @@ function parseEducation(educationLines = []) {
   const degreeRegex =
     /\b(b\.?\s?tech|bachelor(?:\s+of\s+technology)?|m\.?\s?tech|master|b\.?\s?e|m\.?\s?e|bsc|msc|bca|mca|phd|diploma|class\s*xii|class\s*x\b|10th|12th|higher\s+secondary|secondary|ssc|hsc)\b/i;
   const yearRegex = /((?:19|20)\d{2}\s*[-\u2013\u2014]\s*(?:19|20)\d{2})|((?:19|20)\d{2})/i;
+  const percentageRegex =
+    /\b(?:percentage|percent|marks?|score|cgpa|gpa)\b\s*[:\-]?\s*\d{1,2}(?:\.\d{1,2})?(?:\s*%|\s*\/\s*10)?|\d{1,2}(?:\.\d{1,2})?\s*%|\d(?:\.\d{1,2})?\s*\/\s*10|\d{1,2}(?:\.\d{1,2})?\s*cgpa|\d{1,2}(?:\.\d{1,2})?\s*gpa/i;
   const institutionRegex = /\b(college|school|university|institute|academy|management|polytechnic)\b/i;
-  const detailRegex = /\b(class\s*x|class\s*xii|10th|12th|b\.?\s?tech|bachelor|master|m\.?\s?tech|diploma|ssc|hsc|wbbse|wbchse)\b|((?:19|20)\d{2})/i;
+  const detailRegex =
+    /\b(class\s*x|class\s*xii|10th|12th|b\.?\s?tech|bachelor|master|m\.?\s?tech|diploma|ssc|hsc|wbbse|wbchse|cgpa|gpa)\b|((?:19|20)\d{2})|(\d{1,2}(?:\.\d{1,2})?\s*%)/i;
 
   const normalizeDegree = (value = '') => {
     const raw = cleanLine(value).toLowerCase();
@@ -266,19 +269,49 @@ function parseEducation(educationLines = []) {
     const joined = cleanLine([institutionPart, detailPart].filter(Boolean).join(' '));
     const degree = normalizeDegree(pickFirstMatch(detailPart || joined, degreeRegex));
     const year = pickFirstMatch(joined, yearRegex);
+    const percentage = cleanLine(pickFirstMatch(joined, percentageRegex)).toUpperCase();
     const institution = cleanLine(institutionPart)
       .replace(/[|]+/g, ' ')
       .replace(/\s{2,}/g, ' ')
       .replace(/[,-]+$/g, '')
       .trim();
 
-    if (!institution && !degree && !year) return null;
-    return { degree, institution, year: cleanLine(year) };
+    if (!institution && !degree && !year && !percentage) return null;
+    return { degree, institution, year: cleanLine(year), percentage };
   };
 
   for (let index = 0; index < lines.length; index += 1) {
     const current = lines[index];
     const next = lines[index + 1] || '';
+
+    if (current.includes('|')) {
+      const parts = current.split('|').map(cleanLine).filter(Boolean);
+      const joined = cleanLine(parts.join(' '));
+      const degreeFromJoined = normalizeDegree(pickFirstMatch(joined, degreeRegex));
+      const yearFromJoined = cleanLine(pickFirstMatch(joined, yearRegex));
+      const percentageFromJoined = cleanLine(pickFirstMatch(joined, percentageRegex)).toUpperCase();
+
+      const nonMetaPart = parts.find(
+        (part) =>
+          !degreeRegex.test(part) &&
+          !yearRegex.test(part) &&
+          !percentageRegex.test(part)
+      );
+      const institution = cleanLine(
+        parts.find((part) => institutionRegex.test(part)) || nonMetaPart || parts[1] || ''
+      );
+      const degree = degreeFromJoined || normalizeDegree(parts[0] || '');
+
+      if (degree || institution || yearFromJoined || percentageFromJoined) {
+        rows.push({
+          degree,
+          institution,
+          year: yearFromJoined,
+          percentage: percentageFromJoined,
+        });
+      }
+      continue;
+    }
 
     if (institutionRegex.test(current) && detailRegex.test(next)) {
       const row = buildRow(current, next);
@@ -291,6 +324,7 @@ function parseEducation(educationLines = []) {
       const previous = rows[rows.length - 1];
       if (!previous.degree) previous.degree = normalizeDegree(pickFirstMatch(current, degreeRegex));
       if (!previous.year) previous.year = cleanLine(pickFirstMatch(current, yearRegex));
+      if (!previous.percentage) previous.percentage = cleanLine(pickFirstMatch(current, percentageRegex)).toUpperCase();
       continue;
     }
 
@@ -303,15 +337,17 @@ function parseEducation(educationLines = []) {
     const degree = cleanLine(row.degree);
     const institution = cleanLine(row.institution);
     const year = cleanLine(row.year);
-    if (!degree && !institution && !year) continue;
+    const percentage = cleanLine(row.percentage).toUpperCase();
+    if (!degree && !institution && !year && !percentage) continue;
 
     const key = `${degree.toLowerCase()}|${institution.toLowerCase()}`;
     const existing = deduped.find((item) => `${item.degree.toLowerCase()}|${item.institution.toLowerCase()}` === key);
     if (existing) {
       if (!existing.year && year) existing.year = year;
+      if (!existing.percentage && percentage) existing.percentage = percentage;
       continue;
     }
-    deduped.push({ degree, institution, year });
+    deduped.push({ degree, institution, year, percentage });
   }
 
   return deduped;
@@ -439,8 +475,9 @@ function sanitizeStructuredResume(input = {}) {
             degree: cleanLine(item?.degree),
             institution: cleanLine(item?.institution),
             year: cleanLine(item?.year),
+            percentage: cleanLine(item?.percentage).toUpperCase(),
           }))
-          .filter((item) => item.degree || item.institution || item.year)
+          .filter((item) => item.degree || item.institution || item.year || item.percentage)
       : [];
 
   const normalizeProjects = (items) =>

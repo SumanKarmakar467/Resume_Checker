@@ -243,7 +243,9 @@ function renderStructuredResumeText(structuredResume = {}) {
   if (data.education.length) {
     data.education.forEach((item) =>
       lines.push(
-        [item.degree, item.institution, item.year].filter(Boolean).join(' | ') || 'N/A'
+        [item.degree, item.institution, item.year, item.percentage && `Percentage: ${item.percentage}`]
+          .filter(Boolean)
+          .join(' | ') || 'N/A'
       )
     );
   } else {

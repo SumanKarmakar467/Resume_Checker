@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
 import Navbar from "../components/Navbar";
 import TemplateGallery from "../components/TemplateGallery";
 import { incrementUserCounter } from "../services/firestoreUsers";
@@ -38,9 +37,9 @@ const EMPTY_STRUCTURED = {
   summary: "",
   skills: [],
   experience: [{ title: "", company: "", duration: "", description: "" }],
-  education: [{ degree: "", institution: "", year: "" }],
+  education: [{ degree: "", institution: "", year: "", percentage: "" }],
   certifications: [""],
-  projects: [{ name: "", description: "", techStack: "" }],
+  projects: [{ name: "", description: "", techStack: "", demoLink: "", sourceLink: "" }],
 };
 
 const RESUME_TEMPLATES = [
@@ -117,8 +116,9 @@ function sanitizeStructuredData(data = {}) {
           degree: cleanValue(item?.degree),
           institution: cleanValue(item?.institution),
           year: cleanValue(item?.year),
+          percentage: cleanValue(item?.percentage),
         }))
-        .filter((item) => item.degree || item.institution || item.year)
+        .filter((item) => item.degree || item.institution || item.year || item.percentage)
     : [];
 
   const projects = Array.isArray(safe.projects)
@@ -127,8 +127,10 @@ function sanitizeStructuredData(data = {}) {
           name: cleanValue(item?.name),
           description: cleanText(item?.description),
           techStack: cleanValue(item?.techStack),
+          demoLink: cleanValue(item?.demoLink),
+          sourceLink: cleanValue(item?.sourceLink),
         }))
-        .filter((item) => item.name || item.description || item.techStack)
+        .filter((item) => item.name || item.description || item.techStack || item.demoLink || item.sourceLink)
     : [];
 
   const skills = uniqueList(Array.isArray(safe.skills) ? safe.skills : parseCsvToList(safe.skills));
@@ -145,9 +147,9 @@ function sanitizeStructuredData(data = {}) {
     summary: cleanText(safe.summary),
     skills,
     experience: experience.length ? experience : [{ title: "", company: "", duration: "", description: "" }],
-    education: education.length ? education : [{ degree: "", institution: "", year: "" }],
+    education: education.length ? education : [{ degree: "", institution: "", year: "", percentage: "" }],
     certifications: certifications.length ? certifications : [""],
-    projects: projects.length ? projects : [{ name: "", description: "", techStack: "" }],
+    projects: projects.length ? projects : [{ name: "", description: "", techStack: "", demoLink: "", sourceLink: "" }],
   };
 }
 
@@ -160,57 +162,333 @@ function sanitizePdfName(name) {
   return cleaned || "resume_ats_optimized";
 }
 
-async function exportNodeAsPdf(node, fileName) {
-  if (!node) return;
+function drawPdfLink(pdf, label, href, x, y) {
+  const url = normalizeUrl(href);
+  if (!url) return;
+  pdf.setTextColor(0, 90, 190);
+  pdf.textWithLink(label, x, y, { url });
+  const width = pdf.getTextWidth(label);
+  pdf.setDrawColor(0, 90, 190);
+  pdf.line(x, y + 1.5, x + width, y + 1.5);
+  pdf.setTextColor(26, 26, 26);
+}
 
-  const canvas = await html2canvas(node, {
-    scale: 1.8,
-    useCORS: true,
-    backgroundColor: "#ffffff",
-  });
-
+function exportStructuredResumeAsPdf(data, fileName) {
+  const safe = sanitizeStructuredData(data);
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 20;
-  const printableWidth = pageWidth - margin * 2;
-  const printableHeight = pageHeight - margin * 2;
-  const fitRatio = Math.min(printableWidth / canvas.width, printableHeight / canvas.height);
-  const renderWidth = canvas.width * fitRatio;
-  const renderHeight = canvas.height * fitRatio;
-  const offsetX = margin + (printableWidth - renderWidth) / 2;
-  const offsetY = margin + (printableHeight - renderHeight) / 2;
-  const image = canvas.toDataURL("image/png");
-  pdf.addImage(image, "PNG", offsetX, offsetY, renderWidth, renderHeight, undefined, "FAST");
+  const margin = 34;
+  const contentWidth = pageWidth - margin * 2;
+  const lineHeight = 14;
+  let y = margin;
+
+  const ensureSpace = (height = lineHeight) => {
+    if (y + height > pageHeight - margin) {
+      pdf.addPage();
+      y = margin;
+    }
+  };
+
+  const writeWrapped = (text, options = {}) => {
+    const indent = options.indent || 0;
+    const font = options.font || "helvetica";
+    const style = options.style || "normal";
+    const size = options.size || 10.5;
+    const color = options.color || [31, 41, 55];
+    const maxWidth = options.maxWidth || (contentWidth - indent);
+    const value = cleanText(text);
+    if (!value) return;
+
+    pdf.setFont(font, style);
+    pdf.setFontSize(size);
+    pdf.setTextColor(...color);
+    const lines = pdf.splitTextToSize(value, maxWidth);
+    lines.forEach((line) => {
+      ensureSpace(lineHeight);
+      pdf.text(line, margin + indent, y);
+      y += lineHeight;
+    });
+  };
+
+  const writeSection = (label) => {
+    y += 8;
+    ensureSpace(20);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(11, 94, 215);
+    pdf.text(String(label || "").toUpperCase(), margin, y);
+    const textWidth = pdf.getTextWidth(String(label || "").toUpperCase());
+    pdf.setDrawColor(11, 94, 215);
+    pdf.setLineWidth(0.7);
+    pdf.line(margin + textWidth + 8, y - 3, pageWidth - margin, y - 3);
+    y += 10;
+  };
+
+  const list = (items = []) => items.filter(Boolean).join(" | ");
+  const skillLines = buildSkillsLines(safe.skills);
+  const hasExperience = safe.experience.some((item) => item.title || item.company || item.duration || item.description);
+  const hasProjects = safe.projects.some((item) => item.name || item.description || item.techStack || item.demoLink || item.sourceLink);
+  const hasCerts = safe.certifications.some(Boolean);
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setFontSize(24);
+  pdf.setTextColor(11, 94, 215);
+  pdf.text(safe.name || "Your Name", margin, y);
+  y += 18;
+
+  pdf.setFont("helvetica", "normal");
+  pdf.setFontSize(10.5);
+  pdf.setTextColor(51, 65, 85);
+
+  const contacts = [
+    safe.email ? { label: safe.email, href: `mailto:${safe.email}` } : null,
+    safe.phone ? { label: safe.phone, href: `tel:${safe.phone}` } : null,
+    safe.linkedin ? { label: safe.linkedin, href: safe.linkedin } : null,
+    safe.github ? { label: safe.github, href: safe.github } : null,
+  ].filter(Boolean);
+
+  let xCursor = margin;
+  contacts.forEach((contact, index) => {
+    const labelWidth = pdf.getTextWidth(contact.label);
+    const sepWidth = index > 0 ? pdf.getTextWidth(" | ") : 0;
+    if (xCursor + sepWidth + labelWidth > pageWidth - margin) {
+      y += lineHeight;
+      xCursor = margin;
+    }
+    if (index > 0 && xCursor > margin) {
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(" | ", xCursor, y);
+      xCursor += sepWidth;
+    }
+    drawPdfLink(pdf, contact.label, contact.href, xCursor, y);
+    xCursor += labelWidth;
+  });
+  y += 10;
+  pdf.setDrawColor(11, 94, 215);
+  pdf.setLineWidth(1);
+  pdf.line(margin, y, pageWidth - margin, y);
+  y += 10;
+
+  writeSection("Professional Summary");
+  writeWrapped(safe.summary || "Add a concise summary for your profile.");
+
+  writeSection("Skills");
+  skillLines.forEach((line) => writeWrapped(line));
+
+  if (hasExperience) {
+    writeSection("Work Experience");
+    safe.experience.forEach((item) => {
+      const heading = item.title || "Role";
+      writeWrapped(heading, { style: "bold", color: [26, 26, 26] });
+      writeWrapped(list([item.company, item.duration]), { color: [71, 85, 105] });
+      writeWrapped(item.description || "No description provided.");
+      y += 4;
+    });
+  }
+
+  writeSection("Education");
+  safe.education.forEach((item) => {
+    const percentageText = extractEducationPercentage(item);
+    writeWrapped(item.degree || "Degree", { style: "bold", color: [26, 26, 26] });
+    writeWrapped(list([item.institution, item.year, percentageText && `Percentage: ${percentageText}`]));
+    y += 2;
+  });
+
+  if (hasProjects) {
+    writeSection("Projects");
+    safe.projects.forEach((item) => {
+      ensureSpace(lineHeight);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(26, 26, 26);
+      const projectName = item.name || "Project";
+      pdf.text(projectName, margin, y);
+      let projectX = margin + pdf.getTextWidth(projectName);
+      if (item.demoLink || item.sourceLink) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(" - ", projectX + 3, y);
+        projectX += pdf.getTextWidth(" - ") + 3;
+        if (item.demoLink) {
+          drawPdfLink(pdf, "Demo", item.demoLink, projectX, y);
+          projectX += pdf.getTextWidth("Demo") + 10;
+        }
+        if (item.sourceLink) {
+          if (item.demoLink) {
+            pdf.setTextColor(100, 116, 139);
+            pdf.text("|", projectX, y);
+            projectX += pdf.getTextWidth("|") + 8;
+          }
+          drawPdfLink(pdf, "Source", item.sourceLink, projectX, y);
+        }
+      }
+      y += lineHeight;
+      if (item.techStack) writeWrapped(item.techStack, { color: [71, 85, 105] });
+      getProjectBulletPoints(item.description).forEach((line) => {
+        writeWrapped(`- ${line}`);
+      });
+      y += 4;
+    });
+  }
+
+  if (hasCerts) {
+    writeSection("Certifications");
+    safe.certifications.filter(Boolean).forEach((item) => {
+      writeWrapped(`- ${item}`);
+    });
+  }
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
 
 function SectionTitle({ label, color }) {
   return (
-    <div
-      style={{
-        marginTop: 12,
-        marginBottom: 6,
-        fontSize: 11,
-        fontWeight: 800,
-        letterSpacing: 0.6,
-        textTransform: "uppercase",
-        color,
-        borderBottom: `1px solid ${color}`,
-        paddingBottom: 2,
-      }}
-    >
-      {label}
+    <div style={{ marginTop: 12, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: 0.6,
+          textTransform: "uppercase",
+          color,
+          lineHeight: 1.2,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ flex: 1, height: 1, background: color, opacity: 0.5 }} />
+    </div>
+  );
+}
+
+function normalizeUrl(value) {
+  const text = cleanValue(value);
+  if (!text) return "";
+  if (/^(https?:\/\/|mailto:|tel:)/i.test(text)) return text;
+  return `https://${text}`;
+}
+
+function extractEducationPercentage(item = {}) {
+  if (cleanValue(item.percentage)) return cleanValue(item.percentage);
+  const combined = [item.degree, item.institution, item.year].filter(Boolean).join(" ");
+  const percentMatch = combined.match(/\b\d{1,2}(?:\.\d+)?%/);
+  if (percentMatch) return percentMatch[0];
+  const cgpaMatch = combined.match(/\b\d(?:\.\d+)?\s*CGPA\b/i);
+  if (cgpaMatch) return cgpaMatch[0].toUpperCase();
+  return "";
+}
+
+function splitSkillsIntoGroups(skills = []) {
+  const groups = {
+    frontend: [],
+    backend: [],
+    database: [],
+    aiTools: [],
+    other: [],
+  };
+
+  skills.forEach((skill) => {
+    const value = cleanValue(skill);
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (/(html|css|javascript|js|typescript|react|angular|vue|tailwind|bootstrap|vite|next\.?js|responsive)/.test(key)) {
+      groups.frontend.push(value);
+      return;
+    }
+    if (/(node|express|spring|java|python|django|flask|rest|api|jwt|auth|mvc|oop)/.test(key)) {
+      groups.backend.push(value);
+      return;
+    }
+    if (/(mongo|mongodb|firebase|vercel|sql|postgres|mysql|redis|sqlite|supabase)/.test(key)) {
+      groups.database.push(value);
+      return;
+    }
+    if (/(codex|chatgpt|claude|openai|llm|gemini|copilot)/.test(key)) {
+      groups.aiTools.push(value);
+      return;
+    }
+    groups.other.push(value);
+  });
+
+  const unique = (list) => [...new Set(list)];
+  return {
+    frontend: unique(groups.frontend),
+    backend: unique(groups.backend),
+    database: unique(groups.database),
+    aiTools: unique(groups.aiTools),
+    other: unique(groups.other),
+  };
+}
+
+function buildSkillsLines(skills = []) {
+  const grouped = splitSkillsIntoGroups(skills);
+  const lines = [];
+  if (grouped.frontend.length) lines.push(`Frontend - ${grouped.frontend.join(", ")}`);
+  if (grouped.backend.length) lines.push(`Backend - ${grouped.backend.join(", ")}`);
+  if (grouped.database.length) lines.push(`Database - ${grouped.database.join(", ")}`);
+  if (grouped.aiTools.length) lines.push(`AI Tools - ${grouped.aiTools.join(", ")}`);
+  if (grouped.other.length) lines.push(`Other - ${grouped.other.join(", ")}`);
+
+  if (!lines.length) {
+    return [
+      "Frontend - HTML, CSS, JS",
+      "Backend - Node.js, Express.js",
+      "Database - Vercel, MongoDB, Firebase",
+      "AI Tools - Codex, ChatGPT, Claude",
+    ];
+  }
+  return lines;
+}
+
+function clampText(value, max = 110) {
+  const text = cleanText(value);
+  if (!text) return "";
+  return text.length <= max ? text : `${text.slice(0, max - 3).trim()}...`;
+}
+
+function getProjectBulletPoints(description) {
+  const lines = String(description || "")
+    .split("\n")
+    .map((line) => line.replace(/^[-*â€¢]\s*/, "").trim())
+    .filter(Boolean);
+  const points = lines.slice(0, 3).map((line) => clampText(line, 108)).filter(Boolean);
+  return points.length ? points : ["Built and delivered a complete solution."];
+}
+
+function ProjectHeadingWithLinks({ item, fontSize = 10.5 }) {
+  const hasDemo = Boolean(item?.demoLink);
+  const hasSource = Boolean(item?.sourceLink);
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+      <span style={{ fontWeight: 700 }}>{item?.name || "Project"}</span>
+      {(hasDemo || hasSource) ? (
+        <span style={{ fontSize, whiteSpace: "nowrap" }}>
+          {hasDemo ? (
+            <a href={normalizeUrl(item.demoLink)} target="_blank" rel="noreferrer" style={{ color: "#0b5ed7", textDecoration: "none" }}>
+              Demo
+            </a>
+          ) : null}
+          {(hasDemo && hasSource) ? <span style={{ color: "#64748b" }}> | </span> : null}
+          {hasSource ? (
+            <a href={normalizeUrl(item.sourceLink)} target="_blank" rel="noreferrer" style={{ color: "#0b5ed7", textDecoration: "none" }}>
+              Source
+            </a>
+          ) : null}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 function ResumeTemplateBase({ theme, data }) {
   const safe = sanitizeStructuredData(data);
+  const skillLines = buildSkillsLines(safe.skills);
   const hasExperience = safe.experience.some(
     (item) => item.title || item.company || item.duration || String(item.description || "").trim()
   );
+  const hasProjects = safe.projects.some((item) => item.name || item.description || item.techStack || item.demoLink || item.sourceLink);
 
   if (theme.split) {
     return (
@@ -236,35 +514,34 @@ function ResumeTemplateBase({ theme, data }) {
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.2 }}>{safe.name || "Your Name"}</div>
-            <div style={{ fontSize: 10, marginTop: 8 }}>{safe.email || "email@example.com"}</div>
-            <div style={{ fontSize: 10 }}>{safe.phone || "+00 0000 0000"}</div>
-            {safe.linkedin ? <div style={{ fontSize: 10, marginTop: 4 }}>{safe.linkedin}</div> : null}
-            {safe.github ? <div style={{ fontSize: 10 }}>{safe.github}</div> : null}
+            <div style={{ fontSize: 10, marginTop: 8 }}>
+              {safe.email ? <a href={`mailto:${safe.email}`} style={{ color: "inherit", textDecoration: "none" }}>{safe.email}</a> : "email@example.com"}
+            </div>
+            <div style={{ fontSize: 10 }}>
+              {safe.phone ? <a href={`tel:${safe.phone}`} style={{ color: "inherit", textDecoration: "none" }}>{safe.phone}</a> : "+00 0000 0000"}
+            </div>
+            {safe.linkedin ? (
+              <div style={{ fontSize: 10, marginTop: 4 }}>
+                <a href={normalizeUrl(safe.linkedin)} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                  {safe.linkedin}
+                </a>
+              </div>
+            ) : null}
+            {safe.github ? (
+              <div style={{ fontSize: 10 }}>
+                <a href={normalizeUrl(safe.github)} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>
+                  {safe.github}
+                </a>
+              </div>
+            ) : null}
 
             <SectionTitle label="Skills" color="#ffffff" />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "flex-start" }}>
-              {safe.skills.length
-                ? safe.skills.map((skill) => (
-                    <span
-                      key={skill}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.45)",
-                        borderRadius: 999,
-                        fontSize: 8.5,
-                        padding: "2px 7px",
-                        color: "#ffffff",
-                        background: "rgba(255,255,255,0.12)",
-                        display: "inline-block",
-                        maxWidth: "100%",
-                        whiteSpace: "normal",
-                        overflowWrap: "anywhere",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {skill}
-                    </span>
-                  ))
-                : <span style={{ fontSize: 9, color: "rgba(255,255,255,0.85)" }}>No skills added</span>}
+            <div style={{ display: "grid", gap: 3 }}>
+              {skillLines.map((line) => (
+                <div key={line} style={{ fontSize: 9.3, lineHeight: 1.35, color: "rgba(255,255,255,0.95)" }}>
+                  {line}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -288,23 +565,28 @@ function ResumeTemplateBase({ theme, data }) {
             <SectionTitle label="Education" color={theme.heading} />
             {safe.education.map((item, index) => (
               <div key={`${item.degree}-${index}`} style={{ marginBottom: 5 }}>
-                <strong>{item.degree || "Degree"}</strong> {[item.institution, item.year].filter(Boolean).join(" | ")}
+                {(() => {
+                  const percentageText = extractEducationPercentage(item);
+                  return (
+                    <>
+                      <strong>{item.degree || "Degree"}</strong>{" "}
+                      {[item.institution, item.year, percentageText && `Percentage: ${percentageText}`]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </>
+                  );
+                })()}
               </div>
             ))}
 
-            {safe.projects.some((item) => item.name || item.description || item.techStack)
-              ? <SectionTitle label="Projects" color={theme.heading} />
-              : null}
+            {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
             {safe.projects.map((item, index) => (
               <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-                <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
+                <ProjectHeadingWithLinks item={item} fontSize={10} />
                 {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>{item.techStack}</div> : null}
-                {(String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean).length
-                  ? String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean)
-                  : ["No description provided."]
-                ).map((line, bulletIndex) => (
+                {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
                   <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
-                    • {line.replace(/^[-*•]\s*/, "")}
+                    - {line}
                   </div>
                 ))}
               </div>
@@ -327,15 +609,41 @@ function ResumeTemplateBase({ theme, data }) {
         border: `1px solid ${theme.border}`,
         borderRadius: 8,
         color: "#1a1a1a",
-          fontSize: 10.5,
-          lineHeight: 1.4,
-          padding: 12,
-        }}
-      >
+        fontSize: 10.5,
+        lineHeight: 1.4,
+        padding: 12,
+      }}
+    >
       <div style={{ borderBottom: `2px solid ${theme.accent}`, paddingBottom: 8 }}>
         <div style={{ fontSize: 24, fontWeight: 800, color: theme.heading }}>{safe.name || "Your Name"}</div>
-        <div style={{ fontSize: 10.5, color: "#334155", marginTop: 4 }}>
-          {[safe.email, safe.phone, safe.linkedin, safe.github].filter(Boolean).join(" | ")}
+        <div style={{ fontSize: 10.1, color: "#334155", marginTop: 4, display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 2 }}>
+          {[safe.email && (
+            <a key="email" href={`mailto:${safe.email}`} style={{ color: "inherit", textDecoration: "none" }}>{safe.email}</a>
+          ), safe.phone && (
+            <a key="phone" href={`tel:${safe.phone}`} style={{ color: "inherit", textDecoration: "none" }}>{safe.phone}</a>
+          ), safe.linkedin && (
+            <a
+              key="linkedin"
+              href={normalizeUrl(safe.linkedin)}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              {safe.linkedin}
+            </a>
+          ), safe.github && (
+            <a
+              key="github"
+              href={normalizeUrl(safe.github)}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              {safe.github}
+            </a>
+          )]
+            .filter(Boolean)
+            .flatMap((item, index) => (index === 0 ? [item] : [<span key={`sep-${index}`} style={{ margin: "0 6px" }}>|</span>, item]))}
         </div>
       </div>
 
@@ -343,29 +651,12 @@ function ResumeTemplateBase({ theme, data }) {
       <div>{safe.summary || "Add a concise summary for your profile."}</div>
 
       <SectionTitle label="Skills" color={theme.heading} />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "flex-start" }}>
-        {safe.skills.length
-          ? safe.skills.map((skill) => (
-              <span
-                key={skill}
-                style={{
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 999,
-                  background: "#f8fafc",
-                  color: "#1a1a1a",
-                  fontSize: 8.8,
-                  padding: "2px 7px",
-                  display: "inline-block",
-                  maxWidth: "100%",
-                  whiteSpace: "normal",
-                  overflowWrap: "anywhere",
-                  wordBreak: "break-word",
-                }}
-              >
-                {skill}
-              </span>
-            ))
-          : <span style={{ color: "#64748b", fontSize: 10.5 }}>No skills added</span>}
+      <div style={{ display: "grid", gap: 4 }}>
+        {skillLines.map((line) => (
+          <div key={line} style={{ color: "#1f2937" }}>
+            {line}
+          </div>
+        ))}
       </div>
 
       {hasExperience ? <SectionTitle label="Work Experience" color={theme.heading} /> : null}
@@ -384,23 +675,28 @@ function ResumeTemplateBase({ theme, data }) {
       <SectionTitle label="Education" color={theme.heading} />
       {safe.education.map((item, index) => (
         <div key={`${item.degree}-${index}`} style={{ marginBottom: 5, color: "#1f2937" }}>
-          <strong>{item.degree || "Degree"}</strong> {[item.institution, item.year].filter(Boolean).join(" | ")}
+          {(() => {
+            const percentageText = extractEducationPercentage(item);
+            return (
+              <>
+                <strong>{item.degree || "Degree"}</strong>{" "}
+                {[item.institution, item.year, percentageText && `Percentage: ${percentageText}`]
+                  .filter(Boolean)
+                  .join(" | ")}
+              </>
+            );
+          })()}
         </div>
       ))}
 
-      {safe.projects.some((item) => item.name || item.description || item.techStack)
-        ? <SectionTitle label="Projects" color={theme.heading} />
-        : null}
+      {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
       {safe.projects.map((item, index) => (
         <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-          <div style={{ fontWeight: 700 }}>{item.name || "Project"}</div>
+          <ProjectHeadingWithLinks item={item} fontSize={10.5} />
           {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>{item.techStack}</div> : null}
-          {(String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean).length
-            ? String(item.description || "").split("\n").map((line) => line.trim()).filter(Boolean)
-            : ["No description provided."]
-          ).map((line, bulletIndex) => (
+          {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
             <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
-              • {line.replace(/^[-*•]\s*/, "")}
+              - {line}
             </div>
           ))}
         </div>
@@ -562,7 +858,7 @@ function EducationStep({ education, onChange }) {
     updated[index] = { ...updated[index], ...patch };
     onChange(updated);
   };
-  const addEntry = () => onChange([...education, { degree: "", institution: "", year: "" }]);
+  const addEntry = () => onChange([...education, { degree: "", institution: "", year: "", percentage: "" }]);
   const removeEntry = (index) => onChange(education.filter((_, itemIndex) => itemIndex !== index));
 
   return (
@@ -573,6 +869,7 @@ function EducationStep({ education, onChange }) {
             <TextInput label="degree" value={item.degree} onChange={(value) => updateEntry(index, { degree: value })} />
             <TextInput label="institution" value={item.institution} onChange={(value) => updateEntry(index, { institution: value })} />
             <TextInput label="year" value={item.year} onChange={(value) => updateEntry(index, { year: value })} />
+            <TextInput label="percentage / cgpa" value={item.percentage || ""} onChange={(value) => updateEntry(index, { percentage: value })} placeholder="89.2% or 8.7 CGPA" />
           </div>
           <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={education.length <= 1}>
             remove_education()
@@ -590,7 +887,7 @@ function ProjectsStep({ projects, onChange }) {
     updated[index] = { ...updated[index], ...patch };
     onChange(updated);
   };
-  const addEntry = () => onChange([...projects, { name: "", description: "", techStack: "" }]);
+  const addEntry = () => onChange([...projects, { name: "", description: "", techStack: "", demoLink: "", sourceLink: "" }]);
   const removeEntry = (index) => onChange(projects.filter((_, itemIndex) => itemIndex !== index));
 
   return (
@@ -599,6 +896,20 @@ function ProjectsStep({ projects, onChange }) {
         <div key={`project-${index}`} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 12, background: "var(--d3)" }}>
           <TextInput label="project_name" value={item.name} onChange={(value) => updateEntry(index, { name: value })} />
           <TextInput label="tech_stack" value={item.techStack} onChange={(value) => updateEntry(index, { techStack: value })} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+            <TextInput
+              label="demo_link"
+              value={item.demoLink || ""}
+              onChange={(value) => updateEntry(index, { demoLink: value })}
+              placeholder="https://..."
+            />
+            <TextInput
+              label="source_link"
+              value={item.sourceLink || ""}
+              onChange={(value) => updateEntry(index, { sourceLink: value })}
+              placeholder="https://github.com/..."
+            />
+          </div>
           <div className="form-group">
             <label className="form-label">project_description</label>
             <textarea
@@ -677,6 +988,25 @@ export default function ResumeBuilder({
     () => sanitizeStructuredData(generatedStructured || formData),
     [generatedStructured, formData]
   );
+  const atsTextExtractable = useMemo(() => {
+    const textBlob = [
+      previewData.name,
+      previewData.email,
+      previewData.phone,
+      previewData.linkedin,
+      previewData.github,
+      previewData.summary,
+      ...(previewData.skills || []),
+      ...(previewData.experience || []).flatMap((item) => [item.title, item.company, item.duration, item.description]),
+      ...(previewData.education || []).flatMap((item) => [item.degree, item.institution, item.year, item.percentage]),
+      ...(previewData.projects || []).flatMap((item) => [item.name, item.techStack, item.description, item.demoLink, item.sourceLink]),
+      ...(previewData.certifications || []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    return textBlob.length >= 30;
+  }, [previewData]);
 
   const progress = Math.round(((step + 1) / STEPS.length) * 100);
 
@@ -773,19 +1103,19 @@ export default function ResumeBuilder({
   };
 
   const handleDownloadPdf = async () => {
-    if (!previewRef.current) {
-      setError("Preview is not ready yet. Please try again.");
+    if (!atsTextExtractable) {
+      setError("Please add resume content first. ATS extractable text is currently too low.");
       return;
     }
     setIsExportingPdf(true);
     setError("");
     try {
-      await exportNodeAsPdf(previewRef.current, pdfFileName);
+      exportStructuredResumeAsPdf(previewData, pdfFileName);
       if (buildId) {
         await markBuildDownload(buildId, user?.email || "anonymous");
       }
     } catch (err) {
-      setError(err.message || "Could not generate styled PDF. Please try again.");
+      setError(err.message || "Could not generate ATS-safe PDF. Please try again.");
     } finally {
       setIsExportingPdf(false);
     }
@@ -852,6 +1182,9 @@ export default function ResumeBuilder({
           <button className="btn-secondary" onClick={handleDownloadPdf} disabled={isExportingPdf}>
             {isExportingPdf ? "exporting..." : "download_pdf()"}
           </button>
+        </div>
+        <div style={{ marginTop: 8, fontFamily: "var(--font-mono)", fontSize: 11, color: atsTextExtractable ? "#166534" : "#991b1b" }}>
+          ATS text extractable: {atsTextExtractable ? "Yes" : "No"}
         </div>
         {generatedResume ? (
           <div style={{ marginTop: 12 }}>
@@ -974,3 +1307,4 @@ export default function ResumeBuilder({
     </div>
   );
 }
+
