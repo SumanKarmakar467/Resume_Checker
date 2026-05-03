@@ -23,8 +23,9 @@ export default function Navbar({ navigate, user, onLogout }) {
       <div className="nav-links">
         <button onClick={() => navigate("landing")}>features</button>
         <button onClick={() => navigate("builder")}>resume_builder</button>
-        <button onClick={() => navigate("upload")}>ats_checker</button>
-        <button onClick={() => navigate("history")}>history</button>
+        <button onClick={() => navigate("upload")}>analyze_resume</button>
+        <button onClick={() => navigate("history")}>history_dashboard</button>
+        <button onClick={() => navigate("pricing")}>upgrade</button>
         {isAdmin ? <button onClick={() => navigate("admin")}>admin</button> : null}
       </div>
 
@@ -36,7 +37,7 @@ export default function Navbar({ navigate, user, onLogout }) {
           title={isDark ? "Switch to light theme" : "Switch to dark theme"}
           aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
         >
-          {isDark ? "☀" : "🌙"}
+          {isDark ? "☀" : "☾"}
         </button>
 
         {user ? (
@@ -70,3 +71,4 @@ export default function Navbar({ navigate, user, onLogout }) {
     </nav>
   );
 }
+
