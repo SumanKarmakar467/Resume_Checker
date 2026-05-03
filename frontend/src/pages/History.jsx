@@ -22,7 +22,7 @@ export default function History({ navigate, user, onLogout }) {
       setLoading(true);
       setError("");
       try {
-        const data = await requestHistory({ limit });
+        const data = await requestHistory({ limit, userEmail: user?.email || "" });
         if (mounted) setHistory(Array.isArray(data) ? data : []);
       } catch (err) {
         if (mounted) setError(err.message || "Failed to load analysis history.");

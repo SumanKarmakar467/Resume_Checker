@@ -2,6 +2,7 @@
 const configuredBase = String(import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 const RESUME_API_BASE = `${configuredBase}/api/resume`;
 const ADMIN_API_BASE = `${configuredBase}/api/admin`;
+const PAYMENT_API_BASE = `${configuredBase}/api/payment`;
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
 function isRetriableStatus(status) {
@@ -100,6 +101,10 @@ export function requestAdminApi(path, options = {}) {
   return requestApi(ADMIN_API_BASE, path, options);
 }
 
+export function requestPaymentApi(path, options = {}) {
+  return requestApi(PAYMENT_API_BASE, path, options);
+}
+
 function buildAdminHeaders(token, extraHeaders = {}) {
   const headers = { ...extraHeaders };
   if (token) {
@@ -109,12 +114,56 @@ function buildAdminHeaders(token, extraHeaders = {}) {
 }
 
 export function requestHistory(options = {}) {
-  const { limit = 25, includeText = false } = options;
+  const { limit = 25, includeText = false, minScore = 0, userEmail = "" } = options;
   return requestResumeApi("/history", {
     query: {
       limit,
       includeText: includeText ? "1" : "0",
+      minScore,
+      userEmail,
     },
+  });
+}
+
+export function requestBulkAnalyze(formData) {
+  return requestResumeApi("/bulk-analyze", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function deleteHistoryItem(id) {
+  return requestResumeApi(`/history/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function deleteHistoryItemWithUser(id, userEmail = "") {
+  return requestResumeApi(`/history/${id}`, {
+    method: "DELETE",
+    query: { userEmail },
+  });
+}
+
+export function createPaymentOrder(userEmail) {
+  return requestPaymentApi("/create-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userEmail }),
+  });
+}
+
+export function verifyPayment(payload) {
+  return requestPaymentApi("/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchPaymentStatus(userEmail) {
+  return requestPaymentApi("/status", {
+    query: { userEmail },
   });
 }
 
