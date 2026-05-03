@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithRedirect, signOut } from "firebase/auth";
 import { syncUserDocument } from "../services/firestoreUsers";
 import { auth, googleProvider } from "../lib/firebase";
 
@@ -266,19 +266,8 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithGoogle = async () => {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = publicFirebaseUser(result?.user);
-
-    if (!user?.uid || !user?.email) {
-      const error = new Error("Google account email is required.");
-      error.code = "auth/invalid-google-user";
-      throw error;
-    }
-
-    saveSessionUser(user);
-    setCurrentUser(user);
-    await syncUserDocument(user);
-    return user;
+    await signInWithRedirect(auth, googleProvider);
+    return null;
   };
 
   const logout = async () => {

@@ -61,7 +61,7 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text-primary);
-  font-family: 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif;
+  font-family: var(--font-main);
   transition: background 0.25s ease, color 0.25s ease;
 }
 

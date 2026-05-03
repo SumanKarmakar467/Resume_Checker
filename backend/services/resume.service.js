@@ -196,6 +196,66 @@ function mergeStructuredResume(base = {}, candidate = {}) {
   return sanitizeStructuredResume(merged);
 }
 
+function splitSkillsIntoGroups(skills = []) {
+  const groups = {
+    languages: [],
+    frontend: [],
+    backend: [],
+    database: [],
+    toolsPlatforms: [],
+    other: [],
+  };
+
+  skills.forEach((skill) => {
+    const value = String(skill || '').trim();
+    if (!value) return;
+    const key = value.toLowerCase();
+    if (/(^java$|javascript|typescript|python|c\+\+|c#|html|css)/.test(key)) {
+      groups.languages.push(value);
+      return;
+    }
+    if (/(react|tailwind|responsive|component architecture|vite|frontend|ui design|angular|vue|next\.?js)/.test(key)) {
+      groups.frontend.push(value);
+      return;
+    }
+    if (/(node|express|spring|backend|rest|api|jwt|auth)/.test(key)) {
+      groups.backend.push(value);
+      return;
+    }
+    if (/(mongo|mongoose|sql|postgres|mysql|redis|database|odm)/.test(key)) {
+      groups.database.push(value);
+      return;
+    }
+    if (/(git|github|vercel|render|pages|vs code|docker|kubernetes|aws|tools|platform)/.test(key)) {
+      groups.toolsPlatforms.push(value);
+      return;
+    }
+    groups.other.push(value);
+  });
+
+  const dedupe = (list) => [...new Set(list)];
+  return {
+    languages: dedupe(groups.languages),
+    frontend: dedupe(groups.frontend),
+    backend: dedupe(groups.backend),
+    database: dedupe(groups.database),
+    toolsPlatforms: dedupe(groups.toolsPlatforms),
+    other: dedupe(groups.other),
+  };
+}
+
+function buildSkillsLines(skills = []) {
+  const grouped = splitSkillsIntoGroups(skills);
+  const lines = [];
+  if (grouped.languages.length) lines.push(`Languages: ${grouped.languages.join(', ')}`);
+  if (grouped.frontend.length) lines.push(`Frontend: ${grouped.frontend.join(', ')}`);
+  if (grouped.backend.length) lines.push(`Backend: ${grouped.backend.join(', ')}`);
+  if (grouped.database.length) lines.push(`Database: ${grouped.database.join(', ')}`);
+  if (grouped.toolsPlatforms.length) lines.push(`Tools & Platforms: ${grouped.toolsPlatforms.join(', ')}`);
+  if (grouped.other.length) lines.push(`Other: ${grouped.other.join(', ')}`);
+  return lines;
+}
+
 function renderStructuredResumeText(structuredResume = {}) {
   const data = sanitizeStructuredResume(structuredResume);
   const lines = [];
@@ -216,7 +276,16 @@ function renderStructuredResumeText(structuredResume = {}) {
 
   lines.push('Skills');
   lines.push('------');
-  lines.push(data.skills.length ? data.skills.join(', ') : 'N/A');
+  if (data.skills.length) {
+    const skillLines = buildSkillsLines(data.skills);
+    if (skillLines.length) {
+      skillLines.forEach((line) => lines.push(line));
+    } else {
+      lines.push(data.skills.join(', '));
+    }
+  } else {
+    lines.push('N/A');
+  }
   lines.push('');
   const hasExperience = data.experience.some(
     (item) => item.title || item.company || item.duration || normalizeText(item.description)
@@ -230,9 +299,9 @@ function renderStructuredResumeText(structuredResume = {}) {
       lines.push(`Duration: ${item.duration || 'N/A'}`);
       const bullets = normalizeText(item.description).split('\n').map((line) => line.trim()).filter(Boolean);
       if (bullets.length) {
-        bullets.forEach((bullet) => lines.push(`- ${bullet.replace(/^[-*\u2022]\s*/, '')}`));
+        bullets.forEach((bullet) => lines.push(`• ${bullet.replace(/^[-*\u2022]\s*/, '')}`));
       } else {
-        lines.push('- N/A');
+        lines.push('• N/A');
       }
       lines.push('');
     });
@@ -261,9 +330,9 @@ function renderStructuredResumeText(structuredResume = {}) {
       lines.push(item.techStack || 'N/A');
       const bullets = normalizeText(item.description).split('\n').map((line) => line.trim()).filter(Boolean);
       if (bullets.length) {
-        bullets.forEach((bullet) => lines.push(`- ${bullet.replace(/^[-*]\s*/, '')}`));
+        bullets.forEach((bullet) => lines.push(`• ${bullet.replace(/^[-*]\s*/, '')}`));
       } else {
-        lines.push('- N/A');
+        lines.push('• N/A');
       }
       lines.push('');
     });

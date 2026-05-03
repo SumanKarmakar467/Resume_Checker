@@ -34,8 +34,9 @@ export default function Navbar({ navigate, user, onLogout }) {
           onClick={toggleTheme}
           style={{ fontSize: 11, padding: "6px 10px" }}
           title={isDark ? "Switch to light theme" : "Switch to dark theme"}
+          aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
         >
-          {isDark ? "light()" : "dark()"}
+          {isDark ? "☀" : "🌙"}
         </button>
 
         {user ? (

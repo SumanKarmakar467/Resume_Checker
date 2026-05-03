@@ -421,7 +421,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
       y += lineHeight;
       if (item.techStack) writeWrapped(item.techStack, { color: [71, 85, 105] });
       getProjectBulletPoints(item.description).forEach((line) => {
-        writeWrapped(`- ${line}`);
+        writeWrapped(`• ${line}`);
       });
       y += 4;
     });
@@ -532,25 +532,42 @@ function splitSkillsIntoGroups(skills = []) {
 function buildSkillsLines(skills = []) {
   const grouped = splitSkillsIntoGroups(skills);
   const lines = [];
-  if (grouped.languages.length) lines.push(`Languages ${grouped.languages.join(", ")}`);
-  if (grouped.frontend.length) lines.push(`Frontend ${grouped.frontend.join(", ")}`);
-  if (grouped.backend.length) lines.push(`Backend ${grouped.backend.join(", ")}`);
-  if (grouped.database.length) lines.push(`Database ${grouped.database.join(", ")}`);
-  if (grouped.coreCs.length) lines.push(`Core CS ${grouped.coreCs.join(", ")}`);
-  if (grouped.toolsPlatforms.length) lines.push(`Tools & Platforms ${grouped.toolsPlatforms.join(", ")}`);
-  if (grouped.other.length) lines.push(`Other ${grouped.other.join(", ")}`);
+  if (grouped.languages.length) lines.push(`Languages: ${grouped.languages.join(", ")}`);
+  if (grouped.frontend.length) lines.push(`Frontend: ${grouped.frontend.join(", ")}`);
+  if (grouped.backend.length) lines.push(`Backend: ${grouped.backend.join(", ")}`);
+  if (grouped.database.length) lines.push(`Database: ${grouped.database.join(", ")}`);
+  if (grouped.coreCs.length) lines.push(`Core CS: ${grouped.coreCs.join(", ")}`);
+  if (grouped.toolsPlatforms.length) lines.push(`Tools & Platforms: ${grouped.toolsPlatforms.join(", ")}`);
+  if (grouped.other.length) lines.push(`Other: ${grouped.other.join(", ")}`);
 
   if (!lines.length) {
     return [
-      "Languages Java, JavaScript (ES6+), HTML5, CSS3",
-      "Frontend React.js, Tailwind CSS, Responsive UI Design, Component Architecture, Vite",
-      "Backend Node.js, Express.js, Spring Boot, REST API Development, JWT Authentication",
-      "Database MongoDB, Mongoose ODM",
-      "Core CS Data Structures & Algorithms, OOP, MVC Architecture",
-      "Tools & Platforms Git, GitHub, Vercel, Render, GitHub Pages, VS Code",
+      "Languages: Java, JavaScript (ES6+), HTML5, CSS3",
+      "Frontend: React.js, Tailwind CSS, Responsive UI Design, Component Architecture, Vite",
+      "Backend: Node.js, Express.js, Spring Boot, REST API Development, JWT Authentication",
+      "Database: MongoDB, Mongoose ODM",
+      "Core CS: Data Structures & Algorithms, OOP, MVC Architecture",
+      "Tools & Platforms: Git, GitHub, Vercel, Render, GitHub Pages, VS Code",
     ];
   }
   return lines;
+}
+
+function SkillLine({ line, darkLabelColor = "#111827", valueColor = "#1f2937", fontSize = 10.5 }) {
+  const text = String(line || "");
+  const separatorIndex = text.indexOf(":");
+  if (separatorIndex < 0) {
+    return <div style={{ color: valueColor, fontSize }}>{text}</div>;
+  }
+
+  const label = text.slice(0, separatorIndex).trim();
+  const value = text.slice(separatorIndex + 1).trim();
+  return (
+    <div style={{ fontSize }}>
+      <span style={{ color: darkLabelColor, fontWeight: 700 }}>{label}:</span>{" "}
+      <span style={{ color: valueColor }}>{value}</span>
+    </div>
+  );
 }
 
 function clampText(value, max = 110) {
@@ -649,9 +666,13 @@ function ResumeTemplateBase({ theme, data }) {
             <SectionTitle label="Technical Skills" color="#ffffff" />
             <div style={{ display: "grid", gap: 3 }}>
               {skillLines.map((line) => (
-                <div key={line} style={{ fontSize: 9.3, lineHeight: 1.35, color: "rgba(255,255,255,0.95)" }}>
-                  {line}
-                </div>
+                <SkillLine
+                  key={line}
+                  line={line}
+                  fontSize={9.3}
+                  darkLabelColor="#ffffff"
+                  valueColor="rgba(255,255,255,0.95)"
+                />
               ))}
             </div>
           </div>
@@ -697,7 +718,7 @@ function ResumeTemplateBase({ theme, data }) {
                 {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>{item.techStack}</div> : null}
                 {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
                   <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
-                    - {line}
+                    • {line}
                   </div>
                 ))}
               </div>
@@ -764,9 +785,7 @@ function ResumeTemplateBase({ theme, data }) {
       <SectionTitle label="Technical Skills" color={theme.heading} />
       <div style={{ display: "grid", gap: 4 }}>
         {skillLines.map((line) => (
-          <div key={line} style={{ color: "#1f2937" }}>
-            {line}
-          </div>
+          <SkillLine key={line} line={line} darkLabelColor="#0f172a" valueColor="#1f2937" fontSize={10.5} />
         ))}
       </div>
 
@@ -807,7 +826,7 @@ function ResumeTemplateBase({ theme, data }) {
           {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>{item.techStack}</div> : null}
           {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
             <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
-              - {line}
+              • {line}
             </div>
           ))}
         </div>
