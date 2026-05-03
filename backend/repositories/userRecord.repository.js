@@ -5,10 +5,30 @@ async function upsertByEmail(email) {
     { email },
     {
       $set: { lastActiveAt: new Date() },
+      $setOnInsert: { createdAt: new Date(), plan: 'FREE', isPro: false },
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true, lean: true }
+  );
+}
+
+async function markProByEmail(email) {
+  return UserRecord.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        isPro: true,
+        plan: 'PRO',
+        proActivatedAt: new Date(),
+        lastActiveAt: new Date(),
+      },
       $setOnInsert: { createdAt: new Date() },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true, lean: true }
   );
+}
+
+async function findByEmail(email) {
+  return UserRecord.findOne({ email }).lean();
 }
 
 async function findAll() {
@@ -17,5 +37,7 @@ async function findAll() {
 
 module.exports = {
   upsertByEmail,
+  markProByEmail,
+  findByEmail,
   findAll,
 };

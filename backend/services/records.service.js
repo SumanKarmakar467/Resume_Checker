@@ -22,6 +22,32 @@ async function ensureUserRecord(userEmail) {
   return memoryStore.upsertUser(normalizedEmail);
 }
 
+async function markUserAsPro(userEmail) {
+  const normalizedEmail = normalizeUserEmail(userEmail);
+  if (isMongoConnected()) {
+    return userRecordRepository.markProByEmail(normalizedEmail);
+  }
+
+  const user = memoryStore.upsertUser(normalizedEmail);
+  return {
+    ...user,
+    isPro: true,
+    plan: 'PRO',
+    proActivatedAt: new Date().toISOString(),
+  };
+}
+
+async function isUserPro(userEmail) {
+  const normalizedEmail = normalizeUserEmail(userEmail);
+  if (isMongoConnected()) {
+    const user = await userRecordRepository.findByEmail(normalizedEmail);
+    return Boolean(user?.isPro || user?.plan === 'PRO');
+  }
+
+  const user = memoryStore.upsertUser(normalizedEmail);
+  return Boolean(user?.isPro || user?.plan === 'PRO');
+}
+
 async function createAnalysisRecord(payload = {}) {
   const normalizedEmail = normalizeUserEmail(payload.userEmail);
   await ensureUserRecord(normalizedEmail);
@@ -95,6 +121,8 @@ async function getAllBuildRecords() {
 module.exports = {
   normalizeUserEmail,
   ensureUserRecord,
+  markUserAsPro,
+  isUserPro,
   createAnalysisRecord,
   createBuildRecord,
   incrementBuildDownload,

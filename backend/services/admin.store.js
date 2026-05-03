@@ -27,6 +27,9 @@ function upsertUser(email) {
   const created = {
     id: toId('usr'),
     email: key,
+    plan: 'FREE',
+    isPro: false,
+    proActivatedAt: null,
     createdAt: nowIso(),
     lastActiveAt: nowIso(),
   };
