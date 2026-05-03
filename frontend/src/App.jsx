@@ -7,6 +7,8 @@ import ResumeBuilder from "./pages/ResumeBuilder";
 import AuthPage from "./pages/AuthPage";
 import AdminPanel from "./pages/AdminPanel";
 import History from "./pages/History";
+import Dashboard from "./pages/Dashboard";
+import Pricing from "./pages/Pricing";
 import { AuthProvider, useAuthContext } from "./context/AuthContext";
 import "./index.css";
 import "./styles/global.css";
@@ -19,7 +21,9 @@ const PAGE_ROUTES = {
   upload: "/upload",
   result: "/result",
   builder: "/builder",
-  history: "/history",
+  history: "/dashboard",
+  dashboard: "/dashboard",
+  pricing: "/pricing",
   auth: "/login",
   admin: "/admin",
 };
@@ -124,6 +128,14 @@ function AppRoutes() {
       <Route
         path="/history"
         element={<History navigate={legacyNavigate} user={currentUser} onLogout={handleLogout} />}
+      />
+      <Route
+        path="/dashboard"
+        element={<Dashboard navigate={legacyNavigate} user={currentUser} onLogout={handleLogout} />}
+      />
+      <Route
+        path="/pricing"
+        element={<Pricing navigate={legacyNavigate} user={currentUser} onLogout={handleLogout} />}
       />
 
       <Route path="/login" element={<AuthPage initialMode="login" />} />
