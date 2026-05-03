@@ -17,7 +17,17 @@ function getHistory(limit = 25) {
   return memoryHistory.slice(0, safeLimit);
 }
 
+function deleteHistoryById(id = '') {
+  const key = String(id || '').trim();
+  if (!key) return null;
+  const index = memoryHistory.findIndex((item) => String(item._id || item.id || '') === key);
+  if (index < 0) return null;
+  const [removed] = memoryHistory.splice(index, 1);
+  return removed;
+}
+
 module.exports = {
   saveHistory,
   getHistory,
+  deleteHistoryById,
 };

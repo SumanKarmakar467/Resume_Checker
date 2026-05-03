@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const ResumeAnalysisSchema = new mongoose.Schema({
   userEmail: { type: String, default: 'anonymous', lowercase: true, trim: true },
+  fileName: String,
   filename: String,
   resumeText: String,
   jobDescription: String,
@@ -11,6 +12,8 @@ const ResumeAnalysisSchema = new mongoose.Schema({
   missingKeywords: [String],
   feedback: String,
   suggestions: [String],
+  status: { type: String, enum: ['COMPLETED', 'FAILED'], default: 'COMPLETED' },
+  analyzedAt: { type: Date, default: Date.now },
   optimizedResume: String,
   structuredResume: {
     name: String,

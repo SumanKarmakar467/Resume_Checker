@@ -10,13 +10,16 @@ function toAnalysisResponse(record = {}, options = {}) {
   const output = {
     id: record._id || record.id || null,
     userEmail: record.userEmail || 'anonymous',
-    filename: record.filename || "",
+    fileName: record.fileName || record.filename || "",
+    filename: record.filename || record.fileName || "",
     jobDescription: record.jobDescription || "",
     atsScore: Number.isFinite(Number(record.atsScore)) ? Number(record.atsScore) : 0,
     matchedKeywords: toStringArray(record.matchedKeywords),
     missingKeywords: toStringArray(record.missingKeywords),
     feedback: record.feedback || "",
     suggestions: toStringArray(record.suggestions),
+    status: String(record.status || 'COMPLETED'),
+    analyzedAt: record.analyzedAt || record.createdAt || null,
     createdAt: record.createdAt || null,
   };
 
