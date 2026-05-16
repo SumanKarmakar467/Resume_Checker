@@ -8,6 +8,9 @@ const connectDb = require('./config/db');
 const resumeRoutes = require('./routes/resume.routes');
 const adminRoutes = require('./routes/admin.routes');
 const paymentRoutes = require('./routes/payment.routes');
+const upload = require('./middleware/upload.middleware');
+const { enforceFreeAnalyzeLimit } = require('./middleware/proPlan.middleware');
+const { analyzeResumeController } = require('./controllers/resume.controller');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 dotenv.config();
@@ -78,6 +81,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/resume', resumeRoutes);
+app.post('/api/analyze', enforceFreeAnalyzeLimit, upload.single('file'), analyzeResumeController);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payment', paymentRoutes);
 

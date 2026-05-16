@@ -1,61 +1,100 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Navbar from "../components/Navbar";
 
-function Bar({ pct, color }) {
-  const ref = useRef();
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { setW(pct); obs.disconnect(); }
-    }, { threshold: 0.3 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, [pct]);
-  return (
-    <div ref={ref} className="score-bar-track">
-      <div className="score-bar-fill" style={{ width: `${w}%`, background: color }} />
-    </div>
-  );
+function animateNumber(element, target, suffix = "", duration = 1000) {
+  const start = Date.now();
+  const tick = () => {
+    const progress = Math.min(1, (Date.now() - start) / duration);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    if (element) element.textContent = `${Math.round(ease * target)}${suffix}`;
+    if (progress < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function clampScore(value, fallback = 0) {
+  const number = Number(value ?? fallback);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function getColor(score) {
+  if (score >= 85) return "#5dcaa5";
+  if (score >= 70) return "#7c6ff7";
+  if (score >= 50) return "#ef9f27";
+  return "#e24b4a";
+}
+
+function getLabel(score) {
+  if (score >= 85) return "Excellent Match";
+  if (score >= 70) return "Good Match";
+  if (score >= 50) return "Fair Match";
+  return "Needs Work";
+}
+
+function getDesc(score) {
+  if (score >= 85) return "Your resume is highly optimized for ATS systems.";
+  if (score >= 70) return "Your resume is well optimized with room to improve.";
+  return "Use the suggestions below to improve your match score.";
 }
 
 export default function Result({ navigate, result, user, onLogout }) {
-  const [count, setCount] = useState(0);
-  const score = result?.atsScore ?? result?.score ?? 0;
+  const scoreNumRef = useRef();
+  const kwRef = useRef();
+  const fmtRef = useRef();
+  const readRef = useRef();
+  const impactRef = useRef();
+  const circleRef = useRef();
+  const kwBarRef = useRef();
+  const fmtBarRef = useRef();
+  const readBarRef = useRef();
+  const impactBarRef = useRef();
+
+  const score = clampScore(result?.atsScore ?? result?.score);
+  const keywordScore = clampScore(result?.keywordScore, Math.max(0, score - 6));
+  const formatScore = clampScore(result?.formatScore, Math.min(100, score + 8));
+  const readabilityScore = clampScore(result?.readabilityScore ?? result?.completenessScore, Math.min(100, score + 3));
+  const impactScore = clampScore(result?.verbScore, Math.max(0, score - 10));
   const optimizedResume = result?.optimizedResume || "";
 
-  useEffect(() => {
-    let n = 0;
-    const iv = setInterval(() => {
-      n = Math.min(n + 2, score);
-      setCount(n);
-      if (n >= score) clearInterval(iv);
-    }, 18);
-    return () => clearInterval(iv);
-  }, [score]);
-
-  if (!result) {
-    return (
-      <div>
-        <Navbar navigate={navigate} user={user} onLogout={onLogout} />
-        <div style={{ textAlign: "center", padding: "6rem 2rem" }}>
-          <div style={{ fontFamily: "var(--font-mono)", color: "var(--muted)", marginBottom: "1.5rem" }}>
-            # no result found — upload a resume first
-          </div>
-          <button className="btn-primary" onClick={() => navigate("upload")}>
-            → go_to_upload()
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const keywords = result.matchedKeywords || result.keywords || [];
-  const missingKeywords = result.missingKeywords || [];
-  const suggestions = Array.isArray(result.suggestions)
+  const keywords = useMemo(
+    () => result?.foundKeywords || result?.matchedKeywords || result?.keywords || [],
+    [result]
+  );
+  const missingKeywords = result?.missingKeywords || [];
+  const suggestions = Array.isArray(result?.suggestions)
     ? result.suggestions
-    : result.feedback
+    : result?.feedback
       ? [result.feedback]
       : [];
+
+  useEffect(() => {
+    if (!result) return;
+    const circumference = 2 * Math.PI * 68;
+    const timer = window.setTimeout(() => {
+      if (circleRef.current) {
+        circleRef.current.style.strokeDashoffset = circumference - (circumference * score) / 100;
+        circleRef.current.style.stroke = getColor(score);
+      }
+      animateNumber(scoreNumRef.current, score, "", 1200);
+    }, 180);
+
+    const metricTimer = window.setTimeout(() => {
+      animateNumber(kwRef.current, keywordScore, "%", 1000);
+      animateNumber(fmtRef.current, formatScore, "%", 1000);
+      animateNumber(readRef.current, readabilityScore, "%", 1000);
+      animateNumber(impactRef.current, impactScore, "%", 1000);
+      if (kwBarRef.current) kwBarRef.current.style.width = `${keywordScore}%`;
+      if (fmtBarRef.current) fmtBarRef.current.style.width = `${formatScore}%`;
+      if (readBarRef.current) readBarRef.current.style.width = `${readabilityScore}%`;
+      if (impactBarRef.current) impactBarRef.current.style.width = `${impactScore}%`;
+    }, 420);
+
+    return () => {
+      window.clearTimeout(timer);
+      window.clearTimeout(metricTimer);
+    };
+  }, [formatScore, impactScore, keywordScore, readabilityScore, result, score]);
 
   const downloadOptimizedResume = () => {
     if (!optimizedResume.trim()) return;
@@ -68,305 +107,188 @@ export default function Result({ navigate, result, user, onLogout }) {
     URL.revokeObjectURL(url);
   };
 
-  const scoreColor =
-    score >= 80 ? "var(--g)" : score >= 60 ? "var(--o)" : "var(--r)";
-  const scoreGrade =
-    score >= 80 ? "Excellent" : score >= 60 ? "Good" : "Needs Work";
+  if (!result) {
+    return (
+      <div>
+        <Navbar navigate={navigate} user={user} onLogout={onLogout} />
+        <div style={{ textAlign: "center", padding: "6rem 2rem" }}>
+          <div style={{ color: "rgba(255,255,255,0.42)", marginBottom: "1.5rem" }}>
+            No result found. Upload a resume first.
+          </div>
+          <button className="btn-primary" onClick={() => navigate("upload")}>
+            Go to upload
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const circumference = 2 * Math.PI * 68;
+  const metrics = [
+    { ref: kwRef, barRef: kwBarRef, val: keywordScore, label: "Keyword match", color: "#7c6ff7", icon: "KW" },
+    { ref: fmtRef, barRef: fmtBarRef, val: formatScore, label: "Format quality", color: "#5dcaa5", icon: "FM" },
+    { ref: readRef, barRef: readBarRef, val: readabilityScore, label: "Readability", color: "#ef9f27", icon: "RD" },
+    { ref: impactRef, barRef: impactBarRef, val: impactScore, label: "Impact verbs", color: "#e24b4a", icon: "IV" },
+  ];
 
   return (
     <div>
       <Navbar navigate={navigate} user={user} onLogout={onLogout} />
-      <div
-        style={{
-          maxWidth: 960,
-          margin: "0 auto",
-          padding: "3.5rem 2rem",
-          animation: "fadeUp 0.6s ease",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "1rem",
-            marginBottom: "2.5rem",
-          }}
-        >
-          <div>
+      <main style={{ maxWidth: 920, margin: "0 auto", padding: "40px 24px", animation: "slideUp 0.5s ease" }}>
+        <section style={{ textAlign: "center", marginBottom: 44 }}>
+          <div style={{ position: "relative", width: 160, height: 160, margin: "0 auto 24px" }}>
+            <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="80" cy="80" r="68" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
+              <circle
+                ref={circleRef}
+                cx="80"
+                cy="80"
+                r="68"
+                fill="none"
+                stroke="#7c6ff7"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference}
+                style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1), stroke 0.3s" }}
+              />
+            </svg>
             <div
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--g)",
-                marginBottom: 6,
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              # analyze_result.json
+              <div ref={scoreNumRef} style={{ fontSize: 40, fontWeight: 500, color: "#fff", lineHeight: 1 }}>
+                0
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>ATS score</div>
             </div>
-            <h1 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 700 }}>
-              Your ATS Report
-            </h1>
           </div>
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button className="btn-ghost" onClick={() => navigate("upload")}>
-              ← upload_new()
-            </button>
-            <button className="btn-primary" onClick={() => navigate("builder")}>
-              → fix_in_builder()
-            </button>
-          </div>
-        </div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: "#fff", marginBottom: 6 }}>{getLabel(score)}</div>
+          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.42)" }}>{getDesc(score)}</div>
+        </section>
 
-        <div
+        <section
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "1.5rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginBottom: 32,
           }}
         >
-          {/* BIG SCORE */}
-          <div
-            className="card"
-            style={{ gridColumn: "span 1", textAlign: "center" }}
-          >
-            <div className="card-head">ats_score</div>
-            <div style={{ padding: "2rem 1.5rem" }}>
+          {metrics.map((metric, index) => (
+            <div
+              key={metric.label}
+              className="card"
+              style={{ padding: 20, animation: `slideUp 0.5s ease ${index * 0.1}s both` }}
+            >
+              <div style={{ fontSize: 12, color: metric.color, marginBottom: 12 }}>{metric.icon}</div>
+              <div ref={metric.ref} style={{ fontSize: 28, fontWeight: 500, color: "#fff", marginBottom: 4 }}>
+                0%
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{metric.label}</div>
               <div
                 style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "4rem",
-                  fontWeight: 700,
-                  color: scoreColor,
-                  lineHeight: 1,
+                  height: 3,
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: 2,
+                  marginTop: 12,
+                  overflow: "hidden",
                 }}
               >
-                {count}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12,
-                  color: "var(--muted)",
-                  marginTop: 6,
-                }}
-              >
-                / 100
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 13,
-                  color: scoreColor,
-                  marginTop: "1rem",
-                  padding: "6px 16px",
-                  background: `${scoreColor}18`,
-                  borderRadius: 20,
-                  border: `1px solid ${scoreColor}40`,
-                  display: "inline-block",
-                }}
-              >
-                {scoreGrade}
-              </div>
-            </div>
-          </div>
-
-          {/* SCORE BREAKDOWN */}
-          <div className="card" style={{ gridColumn: "span 1" }}>
-            <div className="card-head">score_breakdown</div>
-            <div style={{ padding: "1.5rem" }}>
-              {[
-                {
-                  label: "keyword_match",
-                  pct: result.keywordScore ?? 70,
-                  color: "linear-gradient(90deg, var(--g), #00cc6a)",
-                },
-                {
-                  label: "format_quality",
-                  pct: result.formatScore ?? 80,
-                  color: "linear-gradient(90deg, var(--c), #009bbd)",
-                },
-                {
-                  label: "impact_verbs",
-                  pct: result.verbScore ?? 65,
-                  color: "linear-gradient(90deg, var(--p), #9b5fd8)",
-                },
-                {
-                  label: "completeness",
-                  pct: result.completenessScore ?? 75,
-                  color: "linear-gradient(90deg, var(--o), #f08020)",
-                },
-              ].map(({ label, pct, color }) => (
-                <div key={label} style={{ marginBottom: "1rem" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color: "var(--muted)",
-                      marginBottom: 5,
-                    }}
-                  >
-                    <span>{label}</span>
-                    <span style={{ color: "var(--text)" }}>{pct}%</span>
-                  </div>
-                  <Bar pct={pct} color={color} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* KEYWORDS MATCHED */}
-          {keywords.length > 0 && (
-            <div className="card">
-              <div className="card-head" style={{ color: "var(--g)" }}>
-                keywords_matched ✓
-              </div>
-              <div style={{ padding: "1.5rem" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {keywords.map((kw) => (
-                    <span
-                      key={kw}
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 12,
-                        background: "rgba(0,255,136,0.08)",
-                        color: "var(--g)",
-                        border: "1px solid rgba(0,255,136,0.2)",
-                        padding: "4px 10px",
-                        borderRadius: 4,
-                      }}
-                    >
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* MISSING KEYWORDS */}
-          {missingKeywords.length > 0 && (
-            <div className="card">
-              <div className="card-head" style={{ color: "var(--o)" }}>
-                keywords_missing ⚠
-              </div>
-              <div style={{ padding: "1.5rem" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {missingKeywords.map((kw) => (
-                    <span
-                      key={kw}
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 12,
-                        background: "rgba(255,184,108,0.08)",
-                        color: "var(--o)",
-                        border: "1px solid rgba(255,184,108,0.2)",
-                        padding: "4px 10px",
-                        borderRadius: 4,
-                      }}
-                    >
-                      {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SUGGESTIONS */}
-          {suggestions.length > 0 && (
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <div className="card-head" style={{ color: "var(--c)" }}>
-                ai_suggestions
-              </div>
-              <div style={{ padding: "1.5rem" }}>
                 <div
+                  ref={metric.barRef}
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.9rem",
+                    height: "100%",
+                    background: metric.color,
+                    borderRadius: 2,
+                    width: "0%",
+                    transition: "width 1s ease",
                   }}
-                >
-                  {suggestions.map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        gap: "0.75rem",
-                        padding: "12px 14px",
-                        background: "var(--d3)",
-                        borderRadius: 8,
-                        borderLeft: "3px solid var(--c)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: "var(--font-mono)",
-                          fontSize: 11,
-                          color: "var(--c)",
-                          flexShrink: 0,
-                          paddingTop: 2,
-                        }}
-                      >
-                        {String(i + 1).padStart(2, "0")}
-                      </div>
-                      <div style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.65 }}>
-                        {typeof s === "string" ? s : JSON.stringify(s)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {optimizedResume ? (
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <div className="card-head" style={{ color: "var(--g)" }}>
-                optimized_resume_preview
-              </div>
-              <div style={{ padding: "1.5rem" }}>
-                <textarea
-                  className="form-textarea"
-                  rows={10}
-                  value={optimizedResume}
-                  readOnly
                 />
               </div>
             </div>
-          ) : null}
-        </div>
+          ))}
+        </section>
 
-        {/* Action Buttons */}
-        <div
-          style={{
-            display: "flex",
-            gap: "1rem",
-            justifyContent: "center",
-            marginTop: "3rem",
-            flexWrap: "wrap",
-          }}
-        >
-          <button className="btn-primary" onClick={() => navigate("builder")}>
-            → fix_resume_in_builder()
+        <section style={{ marginBottom: 32 }}>
+          <div className="result-section-label">Keyword analysis</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {keywords.length ? (
+              keywords.map((keyword) => (
+                <span key={keyword} className="keyword-pill keyword-pill-found">
+                  OK {keyword}
+                </span>
+              ))
+            ) : (
+              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>No matched keywords returned.</span>
+            )}
+            {missingKeywords.map((keyword) => (
+              <span key={keyword} className="keyword-pill keyword-pill-missing">
+                Missing {keyword}
+              </span>
+            ))}
+          </div>
+        </section>
+
+        {suggestions.length ? (
+          <section style={{ marginBottom: 32 }}>
+            <div className="result-section-label">Suggestions to improve</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {suggestions.map((suggestion, index) => (
+                <div
+                  key={`${String(suggestion).slice(0, 24)}-${index}`}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    padding: "14px 16px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "0.5px solid rgba(255,255,255,0.06)",
+                    borderRadius: 12,
+                    animation: `slideUp 0.5s ease ${index * 0.1 + 0.3}s both`,
+                  }}
+                >
+                  <div style={{ color: "#7c6ff7", flexShrink: 0, marginTop: 1 }}>{index + 1}</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.62)", lineHeight: 1.6 }}>
+                    {typeof suggestion === "string" ? suggestion : JSON.stringify(suggestion)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {optimizedResume ? (
+          <section className="card" style={{ padding: 18, marginBottom: 32 }}>
+            <div className="result-section-label" style={{ marginBottom: 12 }}>
+              Optimized resume preview
+            </div>
+            <textarea className="form-textarea" rows={10} value={optimizedResume} readOnly />
+          </section>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button className="btn-ghost" onClick={() => navigate("upload")} style={{ flex: "1 1 170px" }}>
+            Check another resume
           </button>
-          <button className="btn-secondary" onClick={() => navigate("upload")}>
-            analyze_another()
+          <button className="btn-primary" onClick={() => navigate("builder")} style={{ flex: "1 1 170px" }}>
+            Fix in builder
           </button>
           {optimizedResume ? (
-            <button className="btn-secondary" onClick={downloadOptimizedResume}>
-              download_optimized_resume()
+            <button className="btn-secondary" onClick={downloadOptimizedResume} style={{ flex: "1 1 170px" }}>
+              Download resume
             </button>
           ) : null}
-          <button className="btn-ghost" onClick={() => navigate("history")}>
-            view_history()
+          <button className="btn-secondary" onClick={() => navigate("history")} style={{ flex: "1 1 170px" }}>
+            View history
           </button>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

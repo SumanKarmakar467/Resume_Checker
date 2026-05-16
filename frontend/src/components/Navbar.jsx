@@ -9,61 +9,82 @@ export default function Navbar({ navigate, user, onLogout }) {
 
   return (
     <nav className="navbar">
-      <div className="nav-logo mono">
-        <button
-          className="btn-ghost"
-          onClick={() => navigate("landing")}
-          style={{ fontSize: 11, padding: "4px 10px", marginRight: 8 }}
-        >
-          Back
-        </button>
-        Resume<span>AI</span>
-      </div>
+      <button
+        onClick={() => navigate("landing")}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: "transparent",
+          border: "none",
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          fontSize: 17,
+          fontWeight: 500,
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#7c6ff7",
+            animation: "float 2s ease-in-out infinite",
+          }}
+        />
+        ATS Resume Checker
+      </button>
 
       <div className="nav-links">
-        <button onClick={() => navigate("landing")}>features</button>
-        <button onClick={() => navigate("builder")}>resume_builder</button>
-        <button onClick={() => navigate("upload")}>analyze_resume</button>
-        <button onClick={() => navigate("history")}>history_dashboard</button>
-        <button onClick={() => navigate("pricing")}>upgrade</button>
-        {isAdmin ? <button onClick={() => navigate("admin")}>admin</button> : null}
+        <button onClick={() => navigate("builder")}>Builder</button>
+        <button onClick={() => navigate("upload")}>Analyze</button>
+        <button onClick={() => navigate("history")}>History</button>
+        <button onClick={() => navigate("pricing")}>Pricing</button>
+        {isAdmin ? <button onClick={() => navigate("admin")}>Admin</button> : null}
       </div>
 
       <div className="nav-right">
+        <span
+          style={{
+            fontSize: 11,
+            padding: "3px 10px",
+            borderRadius: 20,
+            background: "rgba(124,111,247,0.15)",
+            color: "#9d94fa",
+            border: "0.5px solid rgba(124,111,247,0.3)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          AI Powered
+        </span>
+
         <button
           className="btn-ghost"
           onClick={toggleTheme}
-          style={{ fontSize: 11, padding: "6px 10px" }}
           title={isDark ? "Switch to light theme" : "Switch to dark theme"}
           aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+          style={{ padding: "6px 10px" }}
         >
-          {isDark ? "☀" : "☾"}
+          {isDark ? "Light" : "Dark"}
         </button>
 
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "12px",
-                color: "var(--g)",
-              }}
-            >
-              {user.email}
-            </div>
+          <div className="nav-user">
+            <span>{user.email}</span>
             {onLogout ? (
               <button className="btn-ghost" onClick={onLogout}>
-                logout()
+                Logout
               </button>
             ) : null}
           </div>
         ) : (
           <>
             <button className="btn-ghost" onClick={() => navigate("auth")}>
-              login()
+              Login
             </button>
             <button className="btn-primary" onClick={() => navigate("auth")}>
-              $ start_free
+              Start free
             </button>
           </>
         )}
@@ -71,4 +92,3 @@ export default function Navbar({ navigate, user, onLogout }) {
     </nav>
   );
 }
-
