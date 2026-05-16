@@ -248,6 +248,36 @@ function applyRequestedSectionPreset(data = {}) {
   };
 }
 
+function mergeProjectLinks(generated = {}, source = {}) {
+  const generatedSafe = sanitizeStructuredData(generated);
+  const sourceProjects = Array.isArray(source?.projects) ? source.projects : [];
+  const sourceByName = new Map(
+    sourceProjects
+      .filter((item) => cleanValue(item?.name))
+      .map((item) => [cleanValue(item.name).toLowerCase(), item])
+  );
+
+  return {
+    ...generatedSafe,
+    projects: generatedSafe.projects.map((project, index) => {
+      const sourceProject = sourceByName.get(cleanValue(project.name).toLowerCase()) || sourceProjects[index] || {};
+      return {
+        ...project,
+        demoLink: project.demoLink || cleanValue(sourceProject.demoLink),
+        sourceLink: project.sourceLink || cleanValue(sourceProject.sourceLink),
+      };
+    }),
+  };
+}
+
+function displayLabel(label = "") {
+  return String(label || "")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function sanitizePdfName(name) {
   const cleaned = String(name || "")
     .trim()
@@ -912,7 +942,7 @@ function LivePreview({ structuredData, selectedTemplate }) {
   const safe = sanitizeStructuredData(structuredData);
   const Template = TEMPLATE_COMPONENTS[selectedTemplate] || AtsCleanTemplate;
   return (
-    <div style={{ background: "#f5f5f5", border: "1px solid #d1d5db", borderRadius: 10, padding: 12, color: "#1a1a1a" }}>
+    <div style={{ background: "#eef4ff", border: "1px solid rgba(99,102,241,0.22)", borderRadius: 18, padding: 14, color: "#1a1a1a" }}>
       <Template {...safe} />
     </div>
   );
@@ -921,7 +951,7 @@ function LivePreview({ structuredData, selectedTemplate }) {
 function TextInput({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <div className="form-group">
-      <label className="form-label">{label}</label>
+      <label className="form-label">{displayLabel(label)}</label>
       <input
         className="form-input"
         type={type}
@@ -950,7 +980,7 @@ function ContactStep({ data, onChange }) {
 function SummaryStep({ summary, onChange }) {
   return (
     <div className="form-group">
-      <label className="form-label">professional_summary</label>
+      <label className="form-label">Professional Summary</label>
       <textarea
         className="form-textarea"
         rows={6}
@@ -965,7 +995,7 @@ function SummaryStep({ summary, onChange }) {
 function SkillsStep({ skills, onChange }) {
   return (
     <div className="form-group">
-      <label className="form-label">skills (comma separated)</label>
+      <label className="form-label">Skills (comma separated)</label>
       <textarea
         className="form-textarea"
         rows={5}
@@ -996,7 +1026,7 @@ function ExperienceStep({ experience, onChange }) {
             <TextInput label="duration" value={item.duration} onChange={(value) => updateEntry(index, { duration: value })} />
           </div>
           <div className="form-group">
-            <label className="form-label">description / responsibilities</label>
+            <label className="form-label">Description / Responsibilities</label>
             <textarea
               className="form-textarea"
               rows={4}
@@ -1006,11 +1036,11 @@ function ExperienceStep({ experience, onChange }) {
             />
           </div>
           <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={experience.length <= 1}>
-            remove_experience()
+            Remove experience
           </button>
         </div>
       ))}
-      <button className="btn-ghost" onClick={addEntry}>+ add_experience()</button>
+      <button className="btn-ghost" onClick={addEntry}>Add experience</button>
     </div>
   );
 }
@@ -1035,11 +1065,11 @@ function EducationStep({ education, onChange }) {
             <TextInput label="percentage / cgpa" value={item.percentage || ""} onChange={(value) => updateEntry(index, { percentage: value })} placeholder="89.2% or 8.7 CGPA" />
           </div>
           <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={education.length <= 1}>
-            remove_education()
+            Remove education
           </button>
         </div>
       ))}
-      <button className="btn-ghost" onClick={addEntry}>+ add_education()</button>
+      <button className="btn-ghost" onClick={addEntry}>Add education</button>
     </div>
   );
 }
@@ -1074,7 +1104,7 @@ function ProjectsStep({ projects, onChange }) {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">project_description</label>
+            <label className="form-label">Project Description</label>
             <textarea
               className="form-textarea"
               rows={4}
@@ -1083,11 +1113,11 @@ function ProjectsStep({ projects, onChange }) {
             />
           </div>
           <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={projects.length <= 1}>
-            remove_project()
+            Remove project
           </button>
         </div>
       ))}
-      <button className="btn-ghost" onClick={addEntry}>+ add_project()</button>
+      <button className="btn-ghost" onClick={addEntry}>Add project</button>
     </div>
   );
 }
@@ -1112,11 +1142,11 @@ function CertificationsStep({ certifications, onChange }) {
             placeholder="AWS Certified Developer"
           />
           <button className="btn-ghost" onClick={() => removeEntry(index)} disabled={certifications.length <= 1}>
-            remove
+            Remove
           </button>
         </div>
       ))}
-      <button className="btn-ghost" onClick={addEntry}>+ add_certification()</button>
+      <button className="btn-ghost" onClick={addEntry}>Add certification</button>
     </div>
   );
 }
@@ -1243,7 +1273,7 @@ export default function ResumeBuilder({
 
       setGeneratedResume(cleanText(response?.optimizedResume));
       setGeneratedStructured(
-        sanitizeStructuredData(applyRequestedSectionPreset(response?.structuredResume || safeData))
+        mergeProjectLinks(applyRequestedSectionPreset(response?.structuredResume || safeData), safeData)
       );
       setBuildId(response?.buildId || null);
       setStep(STEPS.length - 1);
@@ -1312,7 +1342,7 @@ export default function ResumeBuilder({
     return (
       <div>
         <div className="form-group">
-          <label className="form-label">choose_template</label>
+          <label className="form-label">Choose Template</label>
           <TemplateGallery
             templates={RESUME_TEMPLATES}
             selectedTemplate={selectedTemplate}
@@ -1322,7 +1352,7 @@ export default function ResumeBuilder({
           />
         </div>
         <div className="form-group">
-          <label className="form-label">job_description_for_optimization (optional)</label>
+          <label className="form-label">Job Description for Optimization (optional)</label>
           <textarea
             className="form-textarea"
             rows={4}
@@ -1332,7 +1362,7 @@ export default function ResumeBuilder({
           />
         </div>
         <div className="form-group">
-          <label className="form-label">custom_pdf_name</label>
+          <label className="form-label">Custom PDF Name</label>
           <input
             className="form-input"
             value={pdfFileName}
@@ -1342,29 +1372,29 @@ export default function ResumeBuilder({
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
           <button className="btn-primary" onClick={() => handleGenerate(selectedTemplate)} disabled={loading}>
-            {loading ? "generating..." : "generate_resume()"}
+            {loading ? "Generating..." : "Generate resume"}
           </button>
           <button className="btn-secondary" onClick={handleDownloadPdf} disabled={isExportingPdf}>
-            {isExportingPdf ? "exporting..." : "download_pdf()"}
+            {isExportingPdf ? "Exporting..." : "Download PDF"}
           </button>
         </div>
-        <div style={{ marginTop: 8, fontFamily: "var(--font-mono)", fontSize: 11, color: atsTextExtractable ? "#166534" : "#991b1b" }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: atsTextExtractable ? "#5dcaa5" : "#f09595" }}>
           ATS text extractable: {atsTextExtractable ? "Yes" : "No"}
         </div>
         {generatedResume ? (
           <div style={{ marginTop: 12 }}>
-            <label className="form-label">generated_output_preview</label>
+            <label className="form-label">Generated Output Preview</label>
             <pre
               style={{
-                background: "#f5f5f5",
-                border: "1px solid #d1d5db",
-                borderRadius: 8,
+                background: "rgba(255,255,255,0.04)",
+                border: "0.5px solid rgba(255,255,255,0.08)",
+                borderRadius: 12,
                 padding: 12,
                 maxHeight: 280,
                 overflow: "auto",
-                color: "#1a1a1a",
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
+                color: "rgba(255,255,255,0.78)",
+                fontFamily: "var(--font-main)",
+                fontSize: 12,
                 whiteSpace: "pre-wrap",
               }}
             >
@@ -1380,18 +1410,21 @@ export default function ResumeBuilder({
     <div>
       <Navbar navigate={navigate} user={user} onLogout={onLogout} />
 
-      <div style={{ maxWidth: 1160, margin: "0 auto", padding: "3.5rem 2rem" }}>
+      <div style={{ maxWidth: 1180, margin: "0 auto", padding: "3.5rem 2rem" }}>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--g)", marginBottom: 6 }}>
-            # resume_builder()
+          <div style={{ fontSize: 12, color: "#9d94fa", marginBottom: 8, fontWeight: 500 }}>
+            Guided resume studio
           </div>
-          <h1 style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 700 }}>
-            Build or improve your resume with structured data.
+          <h1 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 500, color: "#fff", maxWidth: 780, lineHeight: 1.12 }}>
+            Build a clean, ATS-ready resume with live templates.
           </h1>
+          <p style={{ color: "rgba(255,255,255,0.46)", marginTop: 10, maxWidth: 640, lineHeight: 1.7 }}>
+            Import your existing resume, refine each section, choose a template, and export a text-selectable PDF.
+          </p>
         </div>
 
         <div className="card" style={{ marginBottom: 14 }}>
-          <div className="card-head">import_existing_resume()</div>
+          <div className="card-head">Import Existing Resume</div>
           <div style={{ padding: 14 }}>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <input
@@ -1405,16 +1438,16 @@ export default function ResumeBuilder({
                 style={{ maxWidth: 420 }}
               />
               <button className="btn-primary" onClick={handleImportExisting} disabled={importLoading}>
-                {importLoading ? "extracting..." : "extract_and_prefill()"}
+                {importLoading ? "Extracting..." : "Extract and prefill"}
               </button>
             </div>
             {existingFile ? (
-              <div style={{ marginTop: 8, color: "var(--muted)", fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                selected: {existingFile.name}
+              <div style={{ marginTop: 8, color: "var(--muted)", fontSize: 12 }}>
+                Selected: {existingFile.name}
               </div>
             ) : null}
             {importMessage ? (
-              <div style={{ marginTop: 10, border: "1px solid rgba(22, 163, 74, 0.4)", background: "rgba(22, 163, 74, 0.08)", borderRadius: 8, padding: "9px 12px", color: "#166534", fontSize: 12 }}>
+              <div style={{ marginTop: 10, border: "0.5px solid rgba(93,202,165,0.28)", background: "rgba(93,202,165,0.08)", borderRadius: 12, padding: "9px 12px", color: "#5dcaa5", fontSize: 12 }}>
                 {importMessage}
               </div>
             ) : null}
@@ -1422,8 +1455,8 @@ export default function ResumeBuilder({
         </div>
 
         {!user ? (
-          <div style={{ background: "rgba(14, 165, 233, 0.08)", border: "1px solid rgba(14, 165, 233, 0.3)", borderRadius: 8, padding: "10px 14px", fontFamily: "var(--font-mono)", fontSize: 12, color: "#075985", marginBottom: 12 }}>
-            guest_limit: builder tries left = {guestBuilderUsed ? 0 : 1}
+          <div style={{ background: "rgba(124,111,247,0.1)", border: "0.5px solid rgba(124,111,247,0.28)", borderRadius: 12, padding: "10px 14px", fontSize: 12, color: "#9d94fa", marginBottom: 12 }}>
+            Builder tries left: {guestBuilderUsed ? 0 : 1}
           </div>
         ) : null}
 
@@ -1431,36 +1464,36 @@ export default function ResumeBuilder({
           <div className="progress-wrap">
             <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--muted)", marginTop: 6 }}>
-            step_{step + 1} / {STEPS.length} - {STEPS[step]}
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+            Step {step + 1} of {STEPS.length}: {STEPS[step]}
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div className="card">
-            <div className="card-head">{STEPS[step].toLowerCase()}.edit()</div>
+            <div className="card-head">{STEPS[step]}</div>
             <div style={{ padding: 14 }}>
               {sectionRenderer()}
 
               {error ? (
-                <div style={{ marginTop: 12, background: "rgba(220, 38, 38, 0.08)", border: "1px solid rgba(220, 38, 38, 0.25)", borderRadius: 8, padding: "10px 12px", color: "#991b1b", fontSize: 12 }}>
+                <div style={{ marginTop: 12, background: "rgba(226,75,74,0.1)", border: "0.5px solid rgba(226,75,74,0.28)", borderRadius: 12, padding: "10px 12px", color: "#f09595", fontSize: 12 }}>
                   {error}
                 </div>
               ) : null}
 
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
                 <button className="btn-ghost" onClick={() => setStep((value) => Math.max(0, value - 1))} disabled={step === 0} style={{ opacity: step === 0 ? 0.5 : 1 }}>
-                  prev()
+                  Previous
                 </button>
                 <button className="btn-primary" onClick={() => setStep((value) => Math.min(STEPS.length - 1, value + 1))} disabled={step === STEPS.length - 1} style={{ opacity: step === STEPS.length - 1 ? 0.6 : 1 }}>
-                  next()
+                  Next
                 </button>
               </div>
             </div>
           </div>
 
           <div className="card">
-            <div className="card-head">live_preview</div>
+            <div className="card-head">Live Preview</div>
             <div style={{ padding: 14 }}>
               <div ref={previewRef}>
                 <LivePreview structuredData={previewData} selectedTemplate={selectedTemplate} />
