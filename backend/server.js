@@ -13,7 +13,7 @@ const { notFound, errorHandler } = require('./middleware/error.middleware');
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT || 5000);
+const PORT = Number(process.env.PORT || 5001);
 const BOOT_TIME = Date.now();
 let storageMode = 'in-memory';
 
