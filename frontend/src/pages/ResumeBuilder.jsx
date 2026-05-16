@@ -320,6 +320,39 @@ function exportStructuredResumeAsPdf(data, fileName) {
     y += 10;
   };
 
+  const writeSkillLine = (line) => {
+    const text = cleanText(line);
+    const separatorIndex = text.indexOf(":");
+    if (separatorIndex < 0) {
+      writeWrapped(text);
+      return;
+    }
+
+    const label = text.slice(0, separatorIndex + 1);
+    const value = text.slice(separatorIndex + 1).trim();
+    const size = 10.5;
+    pdf.setFontSize(size);
+    const labelWidth = pdf.getTextWidth(label);
+    const valueLines = pdf.splitTextToSize(value, contentWidth - labelWidth - 4);
+    const lines = valueLines.length ? valueLines : [""];
+
+    lines.forEach((valueLine, index) => {
+      ensureSpace(lineHeight);
+      if (index === 0) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(31, 41, 55);
+        pdf.text(label, margin, y);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(valueLine, margin + labelWidth + 4, y);
+      } else {
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(31, 41, 55);
+        pdf.text(valueLine, margin + labelWidth + 4, y);
+      }
+      y += lineHeight;
+    });
+  };
+
   const list = (items = []) => items.filter(Boolean).join(" | ");
   const skillLines = buildSkillsLines(safe.skills);
   const hasExperience = safe.experience.some((item) => item.title || item.company || item.duration || item.description);
@@ -369,7 +402,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
   writeWrapped(safe.summary || "Add a concise summary for your profile.");
 
   writeSection("Technical Skills");
-  skillLines.forEach((line) => writeWrapped(line));
+  skillLines.forEach((line) => writeSkillLine(line));
 
   if (hasExperience) {
     writeSection("Work Experience");
@@ -392,12 +425,12 @@ function exportStructuredResumeAsPdf(data, fileName) {
 
   if (hasProjects) {
     writeSection("Projects");
-    safe.projects.forEach((item) => {
+    safe.projects.forEach((item, index) => {
       ensureSpace(lineHeight);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(10.5);
       pdf.setTextColor(26, 26, 26);
-      const projectName = item.name || "Project";
+      const projectName = `${index + 1}. ${item.name || "Project"}`;
       pdf.text(projectName, margin, y);
       let projectX = margin + pdf.getTextWidth(projectName);
       if (item.demoLink || item.sourceLink) {
@@ -564,7 +597,7 @@ function SkillLine({ line, darkLabelColor = "#111827", valueColor = "#1f2937", f
   const value = text.slice(separatorIndex + 1).trim();
   return (
     <div style={{ fontSize }}>
-      <span style={{ color: darkLabelColor, fontWeight: 700 }}>{label}:</span>{" "}
+      <span style={{ color: darkLabelColor, fontWeight: 800 }}>{label}:</span>{" "}
       <span style={{ color: valueColor }}>{value}</span>
     </div>
   );
@@ -585,12 +618,12 @@ function getProjectBulletPoints(description) {
   return points.length ? points : ["Built and delivered a complete solution."];
 }
 
-function ProjectHeadingWithLinks({ item, fontSize = 10.5 }) {
+function ProjectHeadingWithLinks({ item, index = 0, fontSize = 10.5 }) {
   const hasDemo = Boolean(item?.demoLink);
   const hasSource = Boolean(item?.sourceLink);
   return (
     <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
-      <span style={{ fontWeight: 700 }}>{item?.name || "Project"}</span>
+      <span style={{ fontWeight: 800 }}>{index + 1}. {item?.name || "Project"}</span>
       {(hasDemo || hasSource) ? (
         <span style={{ fontSize, whiteSpace: "nowrap" }}>
           {hasDemo ? (
@@ -714,7 +747,7 @@ function ResumeTemplateBase({ theme, data }) {
             {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
             {safe.projects.map((item, index) => (
               <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-                <ProjectHeadingWithLinks item={item} fontSize={10} />
+                <ProjectHeadingWithLinks item={item} index={index} fontSize={10} />
                 {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>{item.techStack}</div> : null}
                 {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
                   <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
@@ -822,7 +855,7 @@ function ResumeTemplateBase({ theme, data }) {
       {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
       {safe.projects.map((item, index) => (
         <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-          <ProjectHeadingWithLinks item={item} fontSize={10.5} />
+          <ProjectHeadingWithLinks item={item} index={index} fontSize={10.5} />
           {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>{item.techStack}</div> : null}
           {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
             <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
