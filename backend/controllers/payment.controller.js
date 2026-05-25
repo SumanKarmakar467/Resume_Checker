@@ -27,6 +27,28 @@ function createClient() {
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
+function isRazorpayAuthenticationError(error) {
+  const statusCode = Number(error?.statusCode || error?.status || 0);
+  const description = String(error?.error?.description || error?.description || error?.message || '');
+  return statusCode === 401 && /authentication failed/i.test(description);
+}
+
+function normalizeRazorpayError(error) {
+  if (isRazorpayAuthenticationError(error)) {
+    const nextError = new Error(
+      'Razorpay authentication failed. Use a matching RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET from the same Razorpay account and mode.'
+    );
+    nextError.status = 502;
+    nextError.silent = true;
+    return nextError;
+  }
+
+  const nextError = new Error(error?.error?.description || error?.message || 'Unable to create Razorpay order.');
+  nextError.status = Number(error?.statusCode || error?.status || 502);
+  nextError.silent = nextError.status >= 500;
+  return nextError;
+}
+
 async function createOrderController(req, res, next) {
   try {
     const userEmail = normalizeUserEmail(req.body?.userEmail);
@@ -37,12 +59,17 @@ async function createOrderController(req, res, next) {
     }
 
     const client = createClient();
-    const order = await client.orders.create({
-      amount: PLAN_AMOUNT_PAISE,
-      currency: 'INR',
-      receipt: `receipt_${Date.now()}`,
-      notes: { userEmail, plan: PLAN_NAME },
-    });
+    let order;
+    try {
+      order = await client.orders.create({
+        amount: PLAN_AMOUNT_PAISE,
+        currency: 'INR',
+        receipt: `receipt_${Date.now()}`,
+        notes: { userEmail, plan: PLAN_NAME },
+      });
+    } catch (razorpayError) {
+      throw normalizeRazorpayError(razorpayError);
+    }
 
     if (mongoose.connection.readyState === 1) {
       try {
@@ -119,4 +146,3 @@ module.exports = {
   verifyPaymentController,
   paymentStatusController,
 };
-
