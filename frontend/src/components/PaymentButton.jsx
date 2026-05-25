@@ -16,6 +16,10 @@ export default function PaymentButton({ user, onSuccess }) {
       setError("Razorpay SDK failed to load.");
       return;
     }
+    if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
+      setError("Razorpay public key is not configured.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -23,8 +27,7 @@ export default function PaymentButton({ user, onSuccess }) {
       const order = await createPaymentOrder(user.email);
 
       const options = {
-        // Use your Razorpay test key in frontend env when needed
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || "",
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency || "INR",
         name: "ATS Resume Checker",
@@ -70,4 +73,3 @@ export default function PaymentButton({ user, onSuccess }) {
     </div>
   );
 }
-
