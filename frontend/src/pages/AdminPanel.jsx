@@ -259,18 +259,24 @@ export default function AdminPanel() {
           </p>
 
           <div className="form-group">
-            <label className="form-label">admin_email</label>
+            <label className="form-label" style={{ color: "#334155", fontWeight: 700 }}>admin_email</label>
             <input
               className="form-input"
               type="email"
               value={form.email}
               onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
               placeholder="admin@example.com"
+              style={{
+                background: "#ffffff",
+                color: "#0f172a",
+                border: "1px solid #94a3b8",
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+              }}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">admin_password</label>
+            <label className="form-label" style={{ color: "#334155", fontWeight: 700 }}>admin_password</label>
             <div style={{ position: "relative" }}>
               <input
                 className="form-input"
@@ -278,7 +284,13 @@ export default function AdminPanel() {
                 value={form.password}
                 onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
                 placeholder="........"
-                style={{ paddingRight: 44 }}
+                style={{
+                  paddingRight: 44,
+                  background: "#ffffff",
+                  color: "#0f172a",
+                  border: "1px solid #94a3b8",
+                  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     handleLogin();

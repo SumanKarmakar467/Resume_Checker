@@ -285,6 +285,202 @@ html {
   transition: stroke-dashoffset 0.8s ease;
 }
 
+.floating-resume-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.floating-resume-card {
+  position: absolute;
+  right: clamp(16px, 8vw, 150px);
+  top: clamp(92px, 14vh, 150px);
+  width: clamp(210px, 24vw, 330px);
+  min-height: 430px;
+  padding: 18px;
+  border: 1px solid rgba(93, 202, 165, 0.28);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9)),
+    repeating-linear-gradient(180deg, transparent 0 27px, rgba(15, 23, 42, 0.06) 28px);
+  color: #0f172a;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 45px rgba(93, 202, 165, 0.16);
+  transform: rotate(7deg);
+  opacity: 0.22;
+  animation: floating-resume-drift 8s ease-in-out infinite;
+}
+
+.floating-resume-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(110deg, transparent 0%, rgba(93, 202, 165, 0.22) 42%, transparent 62%);
+  transform: translateX(-120%);
+  animation: floating-resume-scan 4.8s ease-in-out infinite;
+}
+
+.floating-resume-shadow {
+  position: absolute;
+  right: clamp(12px, 7vw, 138px);
+  top: clamp(395px, 48vh, 520px);
+  width: clamp(190px, 23vw, 310px);
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.34);
+  filter: blur(18px);
+  opacity: 0.26;
+  animation: floating-shadow-pulse 8s ease-in-out infinite;
+}
+
+.floating-resume-top,
+.floating-resume-score,
+.floating-resume-tags {
+  position: relative;
+  z-index: 1;
+}
+
+.floating-resume-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #334155;
+}
+
+.floating-resume-top strong {
+  color: #059669;
+}
+
+.floating-resume-score {
+  display: grid;
+  grid-template-columns: 1fr 86px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.floating-resume-score span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.floating-resume-score strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 44px;
+  line-height: 0.95;
+  color: #059669;
+}
+
+.floating-resume-ring {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: conic-gradient(#10b981 0 100%, rgba(15, 23, 42, 0.1) 0);
+  animation: floating-ring-glow 2.8s ease-in-out infinite;
+}
+
+.floating-resume-ring span {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #059669;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.floating-resume-lines {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.floating-resume-lines span {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.06));
+  transform-origin: left;
+  animation: floating-line-load 2.5s ease both;
+}
+
+.floating-resume-lines span:nth-child(2n) {
+  animation-delay: 0.14s;
+}
+
+.floating-resume-lines span:nth-child(3n) {
+  animation-delay: 0.28s;
+}
+
+.floating-resume-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.floating-resume-tags span,
+.floating-score-badge span {
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #047857;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  padding: 5px 8px;
+  text-transform: uppercase;
+}
+
+.floating-score-badge {
+  position: absolute;
+  right: clamp(190px, 25vw, 385px);
+  top: clamp(360px, 44vh, 455px);
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(93, 202, 165, 0.28);
+  border-radius: 14px;
+  background: rgba(10, 10, 15, 0.68);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.26);
+  opacity: 0.72;
+  animation: floating-badge-pop 4.4s ease-in-out infinite;
+}
+
+.floating-score-badge strong {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: #5dcaa5;
+}
+
+.landing-hero-section > .badge,
+.landing-hero-section > h1,
+.landing-hero-section > p,
+.landing-hero-section > div:not(.grid-bg):not(.floating-resume-scene) {
+  position: relative;
+  z-index: 2;
+}
+
 /* Landing */
 .landing-page {
   position: relative;
@@ -1174,6 +1370,69 @@ html {
   }
 }
 
+@keyframes floating-resume-drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(7deg);
+  }
+  35% {
+    transform: translate3d(-14px, -22px, 0) rotate(4deg);
+  }
+  70% {
+    transform: translate3d(10px, 12px, 0) rotate(9deg);
+  }
+}
+
+@keyframes floating-resume-scan {
+  0%, 18% {
+    transform: translateX(-120%);
+  }
+  52%, 100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes floating-shadow-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.22;
+  }
+  50% {
+    transform: scale(0.86);
+    opacity: 0.14;
+  }
+}
+
+@keyframes floating-ring-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(16, 185, 129, 0);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.35);
+    transform: scale(1.04);
+  }
+}
+
+@keyframes floating-line-load {
+  from {
+    transform: scaleX(0.2);
+    opacity: 0.25;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes floating-badge-pop {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
 @media (max-width: 768px) {
   .landing-brand p {
     font-size: 16px;
@@ -1227,6 +1486,18 @@ html {
   .checks-grid,
   .process-grid {
     grid-template-columns: 1fr;
+  }
+
+  .floating-resume-card {
+    right: -70px;
+    top: 118px;
+    width: 220px;
+    min-height: 340px;
+    opacity: 0.16;
+  }
+
+  .floating-score-badge {
+    display: none;
   }
 
   .auth-lock-banner {

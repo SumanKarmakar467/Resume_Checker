@@ -214,6 +214,45 @@ function TerminalHero() {
   );
 }
 
+function FloatingAtsResume() {
+  const lineWidths = [86, 72, 92, 64, 80, 74, 90, 58, 76, 88, 70, 82];
+
+  return (
+    <div className="floating-resume-scene" aria-hidden="true">
+      <div className="floating-resume-shadow" />
+      <div className="floating-resume-card">
+        <div className="floating-resume-top">
+          <span>ATS RESUME</span>
+          <strong>100%</strong>
+        </div>
+        <div className="floating-resume-score">
+          <div>
+            <span>ATS Score</span>
+            <strong>100</strong>
+          </div>
+          <div className="floating-resume-ring">
+            <span>100%</span>
+          </div>
+        </div>
+        <div className="floating-resume-lines">
+          {lineWidths.map((width, index) => (
+            <span key={index} style={{ width: `${width}%` }} />
+          ))}
+        </div>
+        <div className="floating-resume-tags">
+          <span>keywords matched</span>
+          <span>ats safe</span>
+          <span>impact verbs</span>
+        </div>
+      </div>
+      <div className="floating-score-badge">
+        <span>perfect match</span>
+        <strong>100% ATS</strong>
+      </div>
+    </div>
+  );
+}
+
 /* ── MAIN LANDING PAGE ── */
 export default function LandingPage({ navigate, user, onLogout }) {
   return (
@@ -222,6 +261,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
 
       {/* HERO */}
       <section
+        className="landing-hero-section"
         style={{
           minHeight: "94vh",
           display: "flex",
@@ -235,6 +275,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
         }}
       >
         <div className="grid-bg" />
+        <FloatingAtsResume />
         <div
           style={{
             position: "absolute",
