@@ -306,10 +306,15 @@ html {
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.9)),
     repeating-linear-gradient(180deg, transparent 0 27px, rgba(15, 23, 42, 0.06) 28px);
   color: #0f172a;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 45px rgba(93, 202, 165, 0.16);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.2), 0 0 45px rgba(93, 202, 165, 0.2);
   transform: rotate(7deg);
-  opacity: 0.22;
+  opacity: 0.46;
   animation: floating-resume-drift 8s ease-in-out infinite;
+}
+
+html.dark .floating-resume-card {
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35), 0 0 45px rgba(93, 202, 165, 0.16);
+  opacity: 0.22;
 }
 
 .floating-resume-card::before {
@@ -329,10 +334,14 @@ html {
   width: clamp(190px, 23vw, 310px);
   height: 42px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.34);
+  background: rgba(15, 23, 42, 0.24);
   filter: blur(18px);
   opacity: 0.26;
   animation: floating-shadow-pulse 8s ease-in-out infinite;
+}
+
+html.dark .floating-resume-shadow {
+  background: rgba(0, 0, 0, 0.34);
 }
 
 .floating-resume-top,
@@ -460,11 +469,17 @@ html {
   padding: 12px 14px;
   border: 1px solid rgba(93, 202, 165, 0.28);
   border-radius: 14px;
-  background: rgba(10, 10, 15, 0.68);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(12px);
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.16);
+  opacity: 0.92;
+  animation: floating-badge-pop 4.4s ease-in-out infinite;
+}
+
+html.dark .floating-score-badge {
+  background: rgba(10, 10, 15, 0.68);
   box-shadow: 0 16px 45px rgba(0, 0, 0, 0.26);
   opacity: 0.72;
-  animation: floating-badge-pop 4.4s ease-in-out infinite;
 }
 
 .floating-score-badge strong {

@@ -283,7 +283,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
             height: 600,
             borderRadius: "50%",
             background:
-              "radial-gradient(circle, rgba(0,255,136,0.06) 0%, transparent 70%)",
+              "radial-gradient(circle, rgba(124,111,247,0.16) 0%, rgba(93,202,165,0.1) 36%, transparent 72%)",
             top: "50%",
             left: "50%",
             transform: "translate(-50%, -55%)",

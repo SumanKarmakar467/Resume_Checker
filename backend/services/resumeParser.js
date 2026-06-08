@@ -35,6 +35,7 @@ function isHeadingLine(line = '') {
     education: ['education', 'academic background', 'academics'],
     projects: ['projects', 'key projects', 'project experience'],
     certifications: ['certifications', 'certification', 'licenses', 'license'],
+    languages: ['languages', 'language'],
   };
 
   for (const [key, names] of Object.entries(headingMap)) {
@@ -57,6 +58,7 @@ function splitSections(rawText = '') {
     education: [],
     projects: [],
     certifications: [],
+    languages: [],
   };
 
   let currentSection = 'contact';
@@ -354,10 +356,28 @@ function parseEducation(educationLines = []) {
 }
 
 function parseCertifications(certificationLines = []) {
+  const ignoredHeadings = /^(languages?|skills?|projects?|education|experience|currently\s+building)$/i;
+  const looksLikeCertificate = (value = '') => {
+    const line = cleanLine(value);
+    if (!line || ignoredHeadings.test(line)) return false;
+    const hasCertificateToken =
+      /\b(certified|certification|certificate|developer|genx|iso|nptel|aws|azure|google|oracle|microsoft|freecodecamp|coursera|udemy|view)\b/i.test(line);
+    if (!hasCertificateToken && /\b(html|css|javascript|typescript|react|node|express|mongodb|java|spring|tailwind|bootstrap)\b/i.test(line)) {
+      return false;
+    }
+    if (!hasCertificateToken && /\b(open[-\s]?source|migration|caching|redis|contributing|learn[-\s]?ing|languages?)\b/i.test(line)) {
+      return false;
+    }
+    if (line.length > 86) return false;
+    return hasCertificateToken;
+  };
+
   return toUniqueList(
-    certificationLines.map((line) =>
-      cleanLine(String(line || '').replace(BULLET_PREFIX_REGEX, '').replace(/^(certification|certificate)\s*:/i, ''))
-    ),
+    certificationLines
+      .map((line) =>
+        cleanLine(String(line || '').replace(BULLET_PREFIX_REGEX, '').replace(/^(certification|certificate)\s*:/i, ''))
+      )
+      .filter(looksLikeCertificate),
     40
   );
 }

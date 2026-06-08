@@ -181,6 +181,32 @@ function uniqueList(items = []) {
   return output;
 }
 
+function cleanCertificationList(items = []) {
+  const blocked = /^(languages?|skills?|projects?|education|experience|currently\s+building)$/i;
+  return uniqueList(items)
+    .map((item) => cleanValue(item).replace(/^[-*•]\s*/, ""))
+    .filter((item) => {
+      if (!item || blocked.test(item)) return false;
+      if (item.length > 86) return false;
+      const hasCertificateToken = /\b(certified|certification|certificate|developer|genx|iso|nptel|aws|azure|google|oracle|microsoft|freecodecamp|coursera|udemy|view)\b/i.test(item);
+      if (!hasCertificateToken && /\b(html|css|javascript|typescript|react|node|express|mongodb|java|spring|tailwind|bootstrap)\b/i.test(item)) {
+        return false;
+      }
+      if (!hasCertificateToken && /\b(open[-\s]?source|migration|caching|redis|contributing|learn[-\s]?ing|languages?)\b/i.test(item)) {
+        return false;
+      }
+      return hasCertificateToken;
+    });
+}
+
+function formatCertificationName(value = "") {
+  return cleanValue(value)
+    .replace(/(\d{4})([A-Z][a-z]{2}\s+\d{4})/g, "$1 $2")
+    .replace(/\s*\|\s*view$/i, "")
+    .replace(/\s+view$/i, "")
+    .trim();
+}
+
 function sanitizeStructuredData(data = {}) {
   const safe = data && typeof data === "object" ? data : {};
 
@@ -219,7 +245,7 @@ function sanitizeStructuredData(data = {}) {
     : [];
 
   const skills = uniqueList(Array.isArray(safe.skills) ? safe.skills : parseCsvToList(safe.skills));
-  const certifications = uniqueList(
+  const certifications = cleanCertificationList(
     Array.isArray(safe.certifications) ? safe.certifications : parseCsvToList(safe.certifications)
   );
 
@@ -303,9 +329,9 @@ function exportStructuredResumeAsPdf(data, fileName) {
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 26;
+  const margin = 22;
   const contentWidth = pageWidth - margin * 2;
-  const lineHeight = 10.8;
+  const lineHeight = 10.2;
   let y = margin;
   let pdfHasRoom = true;
 
@@ -338,8 +364,8 @@ function exportStructuredResumeAsPdf(data, fileName) {
 
   const writeSection = (label) => {
     if (!pdfHasRoom) return false;
-    y += 5;
-    if (!ensureSpace(16)) return false;
+    y += 3;
+    if (!ensureSpace(14)) return false;
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9.2);
     pdf.setTextColor(11, 94, 215);
@@ -348,7 +374,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
     pdf.setDrawColor(11, 94, 215);
     pdf.setLineWidth(0.7);
     pdf.line(margin + textWidth + 8, y - 3, pageWidth - margin, y - 3);
-    y += 8;
+    y += 6;
     return true;
   };
 
@@ -393,10 +419,10 @@ function exportStructuredResumeAsPdf(data, fileName) {
   const hasCerts = safe.certifications.some(Boolean);
 
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(20);
+  pdf.setFontSize(18);
   pdf.setTextColor(11, 94, 215);
   pdf.text(safe.name || "Your Name", margin, y);
-  y += 15;
+  y += 13;
 
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(8.7);
@@ -426,11 +452,11 @@ function exportStructuredResumeAsPdf(data, fileName) {
     drawPdfLink(pdf, contact.label, contact.href, xCursor, y);
     xCursor += labelWidth;
   });
-  y += 10;
+  y += 8;
   pdf.setDrawColor(11, 94, 215);
   pdf.setLineWidth(1);
   pdf.line(margin, y, pageWidth - margin, y);
-  y += 10;
+  y += 8;
 
   writeSection("Professional Summary");
   writeWrapped(safe.summary || "Add a concise summary for your profile.");
@@ -445,7 +471,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
       writeWrapped(heading, { style: "bold", color: [26, 26, 26] });
       writeWrapped(list([item.company, item.duration]), { color: [71, 85, 105] });
       writeWrapped(item.description || "No description provided.");
-      y += 4;
+      y += 1;
     });
   }
 
@@ -454,7 +480,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
     const percentageText = extractEducationPercentage(item);
     writeWrapped(item.degree || "Degree", { style: "bold", color: [26, 26, 26] });
     writeWrapped(list([item.institution, item.year, percentageText && `Percentage: ${percentageText}`]));
-    y += 2;
+    y += 1;
   });
 
   if (hasProjects) {
@@ -490,15 +516,16 @@ function exportStructuredResumeAsPdf(data, fileName) {
       getProjectBulletPoints(item.description, 2).forEach((line) => {
         writeWrapped(`• ${line}`, { size: 8.5 });
       });
-      y += 2;
+      y += 1;
     });
   }
 
   if (hasCerts) {
     writeSection("Certifications");
-    safe.certifications.filter(Boolean).forEach((item) => {
-      writeWrapped(`- ${item}`, { size: 8.5 });
-    });
+    writeWrapped(
+      safe.certifications.filter(Boolean).map(formatCertificationName).filter(Boolean).join(" | "),
+      { size: 8.5 }
+    );
   }
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
@@ -792,9 +819,23 @@ function ResumeTemplateBase({ theme, data }) {
             ))}
 
             {safe.certifications.some(Boolean) ? <SectionTitle label="Certifications" color={theme.heading} /> : null}
-            {safe.certifications.filter(Boolean).map((item, index) => (
-              <div key={`${item}-${index}`}>- {item}</div>
-            ))}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {safe.certifications.filter(Boolean).map((item, index) => (
+                <span
+                  key={`${item}-${index}`}
+                  style={{
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 999,
+                    padding: "2px 7px",
+                    color: "#1f2937",
+                    background: "rgba(15,23,42,0.03)",
+                    fontSize: 9.4,
+                  }}
+                >
+                  {formatCertificationName(item)}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -900,11 +941,23 @@ function ResumeTemplateBase({ theme, data }) {
       ))}
 
       {safe.certifications.some(Boolean) ? <SectionTitle label="Certifications" color={theme.heading} /> : null}
-      {safe.certifications.filter(Boolean).map((item, index) => (
-        <div key={`${item}-${index}`} style={{ color: "#1f2937" }}>
-          - {item}
-        </div>
-      ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        {safe.certifications.filter(Boolean).map((item, index) => (
+          <span
+            key={`${item}-${index}`}
+            style={{
+              border: `1px solid ${theme.border}`,
+              borderRadius: 999,
+              padding: "2px 7px",
+              color: "#1f2937",
+              background: "rgba(15,23,42,0.03)",
+              fontSize: 9.8,
+            }}
+          >
+            {formatCertificationName(item)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
