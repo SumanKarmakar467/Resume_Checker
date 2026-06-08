@@ -82,6 +82,12 @@ export default function AuthPage({ initialMode = "login" }) {
         setError("google sign-in was cancelled.");
       } else if (code === "auth/popup-blocked") {
         setError("popup blocked. allow popups and try again.");
+      } else if (code === "auth/unauthorized-domain") {
+        setError("google sign-in domain is not authorized in firebase.");
+      } else if (code === "auth/operation-not-allowed") {
+        setError("google sign-in is not enabled in firebase.");
+      } else if (code === "auth/account-exists-with-different-credential") {
+        setError("an account already exists with this email.");
       } else {
         setError(err?.message || "google sign-in failed. please try again.");
       }

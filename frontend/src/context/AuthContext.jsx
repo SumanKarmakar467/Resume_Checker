@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
+import { getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { syncUserDocument } from "../services/firestoreUsers";
 import { auth, googleProvider } from "../lib/firebase";
 
@@ -7,7 +7,6 @@ const SESSION_KEY = "resume_session_user";
 const ACCOUNTS_KEY = "resume_auth_accounts";
 const OWNER_UID_KEY = "resume_owner_uid";
 const DEFAULT_ADMIN_EMAIL = "karmakarsuman12138@gmail.com";
-const DEFAULT_ADMIN_PASSWORD = "Suman@2004";
 const DEFAULT_ADMIN_NAME = "Suman Admin";
 const LOCAL_AUTH_PROVIDER = "local";
 const GOOGLE_AUTH_PROVIDER = "google";
@@ -70,7 +69,8 @@ function saveOwnerUid(uid) {
 
 function ensureDefaultAdminAccount() {
   const safeEmail = resolveAdminEmail();
-  if (!safeEmail) return null;
+  const defaultPassword = String(import.meta.env.VITE_ADMIN_PASSWORD || "").trim();
+  if (!safeEmail || !defaultPassword) return null;
 
   const accounts = loadAccounts();
   const existingIndex = accounts.findIndex((item) => normalizeEmail(item.email) === safeEmail);
@@ -81,7 +81,7 @@ function ensureDefaultAdminAccount() {
     const updated = {
       ...existing,
       email: safeEmail,
-      password: DEFAULT_ADMIN_PASSWORD,
+      password: defaultPassword,
       displayName: existing.displayName || DEFAULT_ADMIN_NAME,
       createdAt: existing.createdAt || now,
     };
@@ -93,7 +93,7 @@ function ensureDefaultAdminAccount() {
   const account = {
     uid: `admin_${Date.now()}`,
     email: safeEmail,
-    password: DEFAULT_ADMIN_PASSWORD,
+    password: defaultPassword,
     displayName: DEFAULT_ADMIN_NAME,
     createdAt: now,
   };
@@ -162,6 +162,18 @@ export function AuthProvider({ children }) {
     } else {
       setCurrentUser(null);
     }
+
+    getRedirectResult(auth)
+      .then((credential) => {
+        const user = publicFirebaseUser(credential?.user);
+        if (!user) return;
+        saveSessionUser(user);
+        setCurrentUser(user);
+        syncUserDocument(user).catch(() => {});
+      })
+      .catch(() => {
+        // onAuthStateChanged still owns the visible auth state.
+      });
 
     const unsubscribe = onAuthStateChanged(
       auth,
@@ -286,11 +298,14 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    if (auth.currentUser) {
-      await signOut(auth);
+    try {
+      if (auth.currentUser) {
+        await signOut(auth);
+      }
+    } finally {
+      saveSessionUser(null);
+      setCurrentUser(null);
     }
-    saveSessionUser(null);
-    setCurrentUser(null);
   };
 
   const value = useMemo(

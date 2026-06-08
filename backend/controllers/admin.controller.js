@@ -7,7 +7,6 @@ const {
 } = require('../services/records.service');
 
 const DEFAULT_ADMIN_EMAIL = 'karmakarsuman12138@gmail.com';
-const DEFAULT_ADMIN_PASSWORD = 'Suman@2004';
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
@@ -18,7 +17,7 @@ function resolveAdminEmail() {
 }
 
 function resolveAdminPassword() {
-  return String(process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD);
+  return String(process.env.ADMIN_PASSWORD || '');
 }
 
 function resolveJwtSecret() {

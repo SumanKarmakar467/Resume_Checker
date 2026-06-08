@@ -180,6 +180,12 @@ h1, h2, h3, h4, h5 {
   align-items: center;
   justify-content: space-between;
   min-height: 64px;
+  gap: 14px;
+}
+
+.navbar-brand-button {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .nav-logo {
@@ -217,12 +223,14 @@ h1, h2, h3, h4, h5 {
   display: flex;
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .nav-user {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .nav-user span {
@@ -649,7 +657,58 @@ html.dark .grid-bg {
 
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
-  .navbar { padding: 0 1rem; }
+  .navbar {
+    padding: 0.65rem 1rem;
+    min-height: auto;
+    align-items: flex-start;
+  }
   .nav-links { display: none; }
+  .nav-right {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+  .navbar-brand-button {
+    max-width: 46vw;
+    font-size: 14px !important;
+    line-height: 1.2;
+    text-align: left;
+  }
+  .nav-user {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .nav-user span {
+    max-width: 34vw;
+    font-size: 11px;
+  }
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
+    min-height: 36px;
+  }
   .section { padding: 3.5rem 1.25rem; }
+}
+
+@media (max-width: 520px) {
+  .nav-ai-pill {
+    display: none !important;
+  }
+  .navbar {
+    padding-inline: 0.8rem;
+  }
+  .navbar-brand-button {
+    max-width: 50vw;
+  }
+  .nav-right {
+    gap: 6px;
+  }
+  .nav-theme-toggle,
+  .nav-logout-button {
+    padding-inline: 9px !important;
+  }
+  .nav-user span {
+    display: none;
+  }
 }

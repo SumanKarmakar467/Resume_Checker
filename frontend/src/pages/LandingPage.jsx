@@ -445,9 +445,9 @@ export default function LandingPage({ navigate, user, onLogout }) {
             tagType="green"
           />
           <FeatureCard
-            fn="fn: auth.jwt() + oauth()"
+            fn="fn: admin.jwt() + google_oauth()"
             title="Secure Authentication"
-            desc="JWT sessions, GitHub & Google OAuth. Save your resumes, track score history, and access from anywhere."
+            desc="Admin JWT protection plus Google sign-in and persistent local sessions for resume history, builder access, and saved progress."
             tag="new feature 🔥"
             tagType="purple"
           />

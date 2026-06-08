@@ -10,6 +10,7 @@ export default function Navbar({ navigate, user, onLogout }) {
   return (
     <nav className="navbar">
       <button
+        className="navbar-brand-button"
         onClick={() => navigate("landing")}
         style={{
           display: "flex",
@@ -25,6 +26,7 @@ export default function Navbar({ navigate, user, onLogout }) {
         }}
       >
         <span
+          className="nav-ai-pill"
           style={{
             width: 8,
             height: 8,
@@ -60,7 +62,7 @@ export default function Navbar({ navigate, user, onLogout }) {
         </span>
 
         <button
-          className="btn-ghost"
+          className="btn-ghost nav-theme-toggle"
           onClick={toggleTheme}
           title={isDark ? "Switch to light theme" : "Switch to dark theme"}
           aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
@@ -73,7 +75,7 @@ export default function Navbar({ navigate, user, onLogout }) {
           <div className="nav-user">
             <span>{user.email}</span>
             {onLogout ? (
-              <button className="btn-ghost" onClick={onLogout}>
+              <button className="btn-ghost nav-logout-button" onClick={onLogout}>
                 Logout
               </button>
             ) : null}
