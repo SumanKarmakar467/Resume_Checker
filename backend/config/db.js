@@ -1,5 +1,22 @@
 ﻿// Purpose: Initialize and export a reusable MongoDB connection helper.
+const dns = require('dns');
 const mongoose = require('mongoose');
+
+function configureMongoDns() {
+  const rawServers = process.env.MONGODB_DNS_SERVERS || '8.8.8.8,1.1.1.1';
+  const servers = rawServers
+    .split(',')
+    .map((server) => server.trim())
+    .filter(Boolean);
+
+  if (!servers.length) return;
+
+  try {
+    dns.setServers(servers);
+  } catch (error) {
+    console.warn(`[db] Could not configure DNS servers for MongoDB SRV lookup: ${error.message}`);
+  }
+}
 
 async function connectDb() {
   const mongoUri = process.env.MONGODB_URI;
@@ -10,6 +27,7 @@ async function connectDb() {
   }
 
   mongoose.set('strictQuery', true);
+  configureMongoDns();
 
   await mongoose.connect(mongoUri, {
     serverSelectionTimeoutMS: 15000,

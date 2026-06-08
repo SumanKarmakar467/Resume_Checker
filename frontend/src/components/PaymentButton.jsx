@@ -2,6 +2,27 @@ import { useState } from "react";
 import { createPaymentOrder, verifyPayment } from "../api/resumeApi";
 
 const PRO_STORAGE_KEY = "resume_ai_is_pro";
+const RAZORPAY_SDK_URL = "https://checkout.razorpay.com/v1/checkout.js";
+
+function loadRazorpaySdk() {
+  if (window.Razorpay) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const existingScript = document.querySelector(`script[src="${RAZORPAY_SDK_URL}"]`);
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(true), { once: true });
+      existingScript.addEventListener("error", () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = RAZORPAY_SDK_URL;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export default function PaymentButton({ user, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -12,10 +33,6 @@ export default function PaymentButton({ user, onSuccess }) {
       setError("Please login before upgrading.");
       return;
     }
-    if (!window.Razorpay) {
-      setError("Razorpay SDK failed to load.");
-      return;
-    }
     if (!import.meta.env.VITE_RAZORPAY_KEY_ID) {
       setError("Razorpay public key is not configured.");
       return;
@@ -24,6 +41,12 @@ export default function PaymentButton({ user, onSuccess }) {
     setLoading(true);
     setError("");
     try {
+      const sdkLoaded = await loadRazorpaySdk();
+      if (!sdkLoaded || !window.Razorpay) {
+        setError("Razorpay SDK failed to load.");
+        return;
+      }
+
       const order = await createPaymentOrder(user.email);
 
       const options = {

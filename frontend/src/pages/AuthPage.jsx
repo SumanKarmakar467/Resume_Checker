@@ -18,11 +18,13 @@ export default function AuthPage({ initialMode = "login" }) {
 
   const [mode, setMode] = useState(initialMode);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setMode(initialMode);
+    setShowPassword(false);
   }, [initialMode]);
 
   const appNavigate = (target) => {
@@ -70,8 +72,10 @@ export default function AuthPage({ initialMode = "login" }) {
     setLoading(true);
     setError("");
     try {
-      await loginWithGoogle();
-      navigate("/");
+      const user = await loginWithGoogle();
+      if (user) {
+        navigate("/");
+      }
     } catch (err) {
       const code = String(err?.code || "");
       if (code === "auth/popup-closed-by-user") {
@@ -156,16 +160,27 @@ export default function AuthPage({ initialMode = "login" }) {
 
               <div className="form-group">
                 <label className="form-label">password</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  placeholder="........"
-                  value={form.password}
-                  onChange={(event) => update("password", event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleSubmit();
-                  }}
-                />
+                <div className="password-input-shell">
+                  <input
+                    className="form-input password-input-control"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="........"
+                    value={form.password}
+                    onChange={(event) => update("password", event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleSubmit();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
 
               {error && (

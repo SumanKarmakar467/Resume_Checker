@@ -325,6 +325,37 @@ h1, h2, h3, h4, h5 {
   opacity: 0.6;
 }
 
+.password-input-shell {
+  position: relative;
+}
+
+.password-input-control {
+  padding-right: 76px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(124,111,247,0.34);
+  border-radius: 8px;
+  background: rgba(124,111,247,0.12);
+  color: var(--text);
+  min-width: 52px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.password-toggle-btn:hover {
+  border-color: rgba(124,111,247,0.62);
+  background: rgba(124,111,247,0.18);
+}
+
 /* ── SCORE BARS ── */
 .score-bar-track {
   height: 6px;

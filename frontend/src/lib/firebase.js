@@ -3,13 +3,13 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD3gcCxNFkGIjF1vUy1WG5i4CweEcKNhos",
-  authDomain: "resume-a1a53.firebaseapp.com",
-  projectId: "resume-a1a53",
-  storageBucket: "resume-a1a53.firebasestorage.app",
-  messagingSenderId: "744102944077",
-  appId: "1:744102944077:web:0d5aee1be376c3cdf2eb04",
-  measurementId: "G-YNZ2EYWYL2",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD3gcCxNFkGIjF1vUy1WG5i4CweEcKNhos",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "resume-a1a53.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "resume-a1a53",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "resume-a1a53.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "744102944077",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:744102944077:web:0d5aee1be376c3cdf2eb04",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-YNZ2EYWYL2",
 };
 
 const app = initializeApp(firebaseConfig);

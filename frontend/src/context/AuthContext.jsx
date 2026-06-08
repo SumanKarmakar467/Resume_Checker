@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, signInWithRedirect, signOut } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from "firebase/auth";
 import { syncUserDocument } from "../services/firestoreUsers";
 import { auth, googleProvider } from "../lib/firebase";
 
@@ -266,8 +266,23 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithGoogle = async () => {
-    await signInWithRedirect(auth, googleProvider);
-    return null;
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const user = publicFirebaseUser(credential.user);
+      if (user) {
+        saveSessionUser(user);
+        setCurrentUser(user);
+        await syncUserDocument(user);
+      }
+      return user;
+    } catch (error) {
+      const code = String(error?.code || "");
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      }
+      throw error;
+    }
   };
 
   const logout = async () => {
