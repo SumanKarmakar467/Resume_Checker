@@ -163,14 +163,14 @@ export default function Result({ navigate, result, user, onLogout }) {
                 justifyContent: "center",
               }}
             >
-              <div ref={scoreNumRef} style={{ fontSize: 40, fontWeight: 500, color: "#fff", lineHeight: 1 }}>
+              <div ref={scoreNumRef} style={{ fontSize: 40, fontWeight: 500, color: "var(--text)", lineHeight: 1 }}>
                 0
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>ATS score</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>ATS score</div>
             </div>
           </div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: "#fff", marginBottom: 6 }}>{getLabel(score)}</div>
-          <div style={{ fontSize: 14, color: "rgba(255,255,255,0.42)" }}>{getDesc(score)}</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: "var(--text)", marginBottom: 6 }}>{getLabel(score)}</div>
+          <div style={{ fontSize: 14, color: "var(--muted)" }}>{getDesc(score)}</div>
         </section>
 
         <section
@@ -188,14 +188,14 @@ export default function Result({ navigate, result, user, onLogout }) {
               style={{ padding: 20, animation: `slideUp 0.5s ease ${index * 0.1}s both` }}
             >
               <div style={{ fontSize: 12, color: metric.color, marginBottom: 12 }}>{metric.icon}</div>
-              <div ref={metric.ref} style={{ fontSize: 28, fontWeight: 500, color: "#fff", marginBottom: 4 }}>
+              <div ref={metric.ref} style={{ fontSize: 28, fontWeight: 500, color: "var(--text)", marginBottom: 4 }}>
                 0%
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{metric.label}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>{metric.label}</div>
               <div
                 style={{
                   height: 3,
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--d4)",
                   borderRadius: 2,
                   marginTop: 12,
                   overflow: "hidden",
@@ -226,7 +226,7 @@ export default function Result({ navigate, result, user, onLogout }) {
                 </span>
               ))
             ) : (
-              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>No matched keywords returned.</span>
+              <span style={{ color: "var(--muted)", fontSize: 13 }}>No matched keywords returned.</span>
             )}
             {missingKeywords.map((keyword) => (
               <span key={keyword} className="keyword-pill keyword-pill-missing">
@@ -247,14 +247,14 @@ export default function Result({ navigate, result, user, onLogout }) {
                     display: "flex",
                     gap: 12,
                     padding: "14px 16px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "0.5px solid rgba(255,255,255,0.06)",
+                    background: "var(--d3)",
+                    border: "0.5px solid var(--border)",
                     borderRadius: 12,
                     animation: `slideUp 0.5s ease ${index * 0.1 + 0.3}s both`,
                   }}
                 >
                   <div style={{ color: "#7c6ff7", flexShrink: 0, marginTop: 1 }}>{index + 1}</div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.62)", lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>
                     {typeof suggestion === "string" ? suggestion : JSON.stringify(suggestion)}
                   </div>
                 </div>

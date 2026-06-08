@@ -22,9 +22,9 @@ function modeButtonStyle(active) {
   return {
     flex: 1,
     borderRadius: 12,
-    border: active ? "0.5px solid rgba(124,111,247,0.45)" : "0.5px solid rgba(255,255,255,0.08)",
-    background: active ? "rgba(124,111,247,0.18)" : "rgba(255,255,255,0.03)",
-    color: active ? "#fff" : "rgba(255,255,255,0.55)",
+    border: active ? "0.5px solid rgba(124,111,247,0.45)" : "0.5px solid var(--border)",
+    background: active ? "rgba(124,111,247,0.18)" : "var(--d3)",
+    color: active ? "var(--text)" : "var(--muted)",
     padding: "12px 14px",
     cursor: "pointer",
     fontFamily: "inherit",
@@ -242,7 +242,7 @@ export default function UploadResume({
               alignItems: "center",
               gap: 6,
               fontSize: 12,
-              color: "#9d94fa",
+              color: "var(--c)",
               background: "rgba(124,111,247,0.1)",
               border: "0.5px solid rgba(124,111,247,0.25)",
               padding: "5px 14px",
@@ -258,19 +258,19 @@ export default function UploadResume({
               fontSize: "clamp(2.3rem, 6vw, 3rem)",
               fontWeight: 500,
               lineHeight: 1.15,
-              color: "#fff",
+              color: "var(--text)",
               marginBottom: 16,
               letterSpacing: 0,
             }}
           >
             Beat the ATS,
             <br />
-            land the <span style={{ color: "#7c6ff7" }}>interview</span>
+            land the <span style={{ color: "var(--c)" }}>interview</span>
           </h1>
           <p
             style={{
               fontSize: 16,
-              color: "rgba(255,255,255,0.42)",
+              color: "var(--muted)",
               maxWidth: 560,
               margin: "0 auto 42px",
               lineHeight: 1.7,
@@ -352,20 +352,20 @@ export default function UploadResume({
                   justifyContent: "center",
                   margin: "0 auto 20px",
                   fontSize: 24,
-                  color: "#7c6ff7",
+                  color: "var(--c)",
                   animation: "float 3s ease-in-out infinite",
                 }}
               >
                 UP
               </div>
-              <div style={{ fontSize: 16, fontWeight: 500, color: "#fff", marginBottom: 8 }}>
+              <div style={{ fontSize: 16, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>
                 {uploadMode === "single"
                   ? file?.name || "Drop your resume here"
                   : bulkFiles.length
                     ? `${bulkFiles.length} resumes selected`
                     : "Drop multiple resumes here"}
               </div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)" }}>
+              <div style={{ fontSize: 13, color: "var(--muted)" }}>
                 {uploadMode === "single" && file
                   ? "Ready to analyze"
                   : "or browse files from your computer"}
@@ -378,9 +378,9 @@ export default function UploadResume({
                       fontSize: 11,
                       padding: "3px 10px",
                       borderRadius: 6,
-                      background: "rgba(255,255,255,0.05)",
-                      color: "rgba(255,255,255,0.4)",
-                      border: "0.5px solid rgba(255,255,255,0.08)",
+                      background: "var(--d3)",
+                      color: "var(--muted)",
+                      border: "0.5px solid var(--border)",
                     }}
                   >
                     {type}

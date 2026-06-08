@@ -104,10 +104,10 @@ export default function LoadingScreen({ compact = false, progressLabel = "" }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 15, fontWeight: 500, color: "#fff", marginBottom: 8 }}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>
         {progressLabel || `${activeStep.label}...`}
       </div>
-      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 30 }}>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 30 }}>
         {activeStep.sub}
       </div>
 
@@ -123,7 +123,7 @@ export default function LoadingScreen({ compact = false, progressLabel = "" }) {
                 alignItems: "center",
                 gap: 12,
                 fontSize: 13,
-                color: done ? "rgba(255,255,255,0.55)" : active ? "#fff" : "rgba(255,255,255,0.25)",
+                color: done ? "var(--muted)" : active ? "var(--text)" : "var(--muted)",
                 transition: "all 0.3s",
               }}
             >

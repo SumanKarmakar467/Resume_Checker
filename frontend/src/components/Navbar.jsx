@@ -17,7 +17,7 @@ export default function Navbar({ navigate, user, onLogout }) {
           gap: 10,
           background: "transparent",
           border: "none",
-          color: "#fff",
+          color: "var(--text)",
           cursor: "pointer",
           fontFamily: "inherit",
           fontSize: 17,
@@ -51,7 +51,7 @@ export default function Navbar({ navigate, user, onLogout }) {
             padding: "3px 10px",
             borderRadius: 20,
             background: "rgba(124,111,247,0.15)",
-            color: "#9d94fa",
+            color: "var(--c)",
             border: "0.5px solid rgba(124,111,247,0.3)",
             whiteSpace: "nowrap",
           }}

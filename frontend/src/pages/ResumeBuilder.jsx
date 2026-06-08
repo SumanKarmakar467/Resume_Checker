@@ -303,54 +303,57 @@ function exportStructuredResumeAsPdf(data, fileName) {
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 34;
+  const margin = 26;
   const contentWidth = pageWidth - margin * 2;
-  const lineHeight = 14;
+  const lineHeight = 10.8;
   let y = margin;
+  let pdfHasRoom = true;
 
   const ensureSpace = (height = lineHeight) => {
-    if (y + height > pageHeight - margin) {
-      pdf.addPage();
-      y = margin;
-    }
+    const hasRoom = y + height <= pageHeight - margin;
+    if (!hasRoom) pdfHasRoom = false;
+    return hasRoom;
   };
 
   const writeWrapped = (text, options = {}) => {
     const indent = options.indent || 0;
     const font = options.font || "helvetica";
     const style = options.style || "normal";
-    const size = options.size || 10.5;
+    const size = options.size || 8.8;
     const color = options.color || [31, 41, 55];
     const maxWidth = options.maxWidth || (contentWidth - indent);
     const value = cleanText(text);
-    if (!value) return;
+    if (!value || !pdfHasRoom) return;
 
     pdf.setFont(font, style);
     pdf.setFontSize(size);
     pdf.setTextColor(...color);
     const lines = pdf.splitTextToSize(value, maxWidth);
     lines.forEach((line) => {
-      ensureSpace(lineHeight);
+      if (!ensureSpace(lineHeight)) return;
       pdf.text(line, margin + indent, y);
       y += lineHeight;
     });
   };
 
   const writeSection = (label) => {
-    y += 8;
-    ensureSpace(20);
+    if (!pdfHasRoom) return false;
+    y += 5;
+    if (!ensureSpace(16)) return false;
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11);
+    pdf.setFontSize(9.2);
     pdf.setTextColor(11, 94, 215);
     pdf.text(String(label || "").toUpperCase(), margin, y);
     const textWidth = pdf.getTextWidth(String(label || "").toUpperCase());
     pdf.setDrawColor(11, 94, 215);
     pdf.setLineWidth(0.7);
     pdf.line(margin + textWidth + 8, y - 3, pageWidth - margin, y - 3);
-    y += 10;
+    y += 8;
+    return true;
   };
 
   const writeSkillLine = (line) => {
+    if (!pdfHasRoom) return;
     const text = cleanText(line);
     const separatorIndex = text.indexOf(":");
     if (separatorIndex < 0) {
@@ -360,14 +363,14 @@ function exportStructuredResumeAsPdf(data, fileName) {
 
     const label = text.slice(0, separatorIndex + 1);
     const value = text.slice(separatorIndex + 1).trim();
-    const size = 10.5;
+    const size = 8.8;
     pdf.setFontSize(size);
     const labelWidth = pdf.getTextWidth(label);
     const valueLines = pdf.splitTextToSize(value, contentWidth - labelWidth - 4);
     const lines = valueLines.length ? valueLines : [""];
 
     lines.forEach((valueLine, index) => {
-      ensureSpace(lineHeight);
+      if (!ensureSpace(lineHeight)) return;
       if (index === 0) {
         pdf.setFont("helvetica", "bold");
         pdf.setTextColor(31, 41, 55);
@@ -390,13 +393,13 @@ function exportStructuredResumeAsPdf(data, fileName) {
   const hasCerts = safe.certifications.some(Boolean);
 
   pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(24);
+  pdf.setFontSize(20);
   pdf.setTextColor(11, 94, 215);
   pdf.text(safe.name || "Your Name", margin, y);
-  y += 18;
+  y += 15;
 
   pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(10.5);
+  pdf.setFontSize(8.7);
   pdf.setTextColor(51, 65, 85);
 
   const contacts = [
@@ -411,6 +414,7 @@ function exportStructuredResumeAsPdf(data, fileName) {
     const labelWidth = pdf.getTextWidth(contact.label);
     const sepWidth = index > 0 ? pdf.getTextWidth(" | ") : 0;
     if (xCursor + sepWidth + labelWidth > pageWidth - margin) {
+      if (!ensureSpace(lineHeight)) return;
       y += lineHeight;
       xCursor = margin;
     }
@@ -456,9 +460,9 @@ function exportStructuredResumeAsPdf(data, fileName) {
   if (hasProjects) {
     writeSection("Projects");
     safe.projects.forEach((item, index) => {
-      ensureSpace(lineHeight);
+      if (!ensureSpace(lineHeight * 3)) return;
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(10.5);
+      pdf.setFontSize(9);
       pdf.setTextColor(26, 26, 26);
       const projectName = `${index + 1}. ${item.name || "Project"}`;
       pdf.text(projectName, margin, y);
@@ -482,18 +486,18 @@ function exportStructuredResumeAsPdf(data, fileName) {
         }
       }
       y += lineHeight;
-      if (item.techStack) writeWrapped(item.techStack, { color: [71, 85, 105] });
-      getProjectBulletPoints(item.description).forEach((line) => {
-        writeWrapped(`• ${line}`);
+      if (item.techStack) writeWrapped(item.techStack, { color: [71, 85, 105], size: 8.4 });
+      getProjectBulletPoints(item.description, 2).forEach((line) => {
+        writeWrapped(`• ${line}`, { size: 8.5 });
       });
-      y += 4;
+      y += 2;
     });
   }
 
   if (hasCerts) {
     writeSection("Certifications");
     safe.certifications.filter(Boolean).forEach((item) => {
-      writeWrapped(`- ${item}`);
+      writeWrapped(`- ${item}`, { size: 8.5 });
     });
   }
 
@@ -639,12 +643,12 @@ function clampText(value, max = 110) {
   return text.length <= max ? text : `${text.slice(0, max - 3).trim()}...`;
 }
 
-function getProjectBulletPoints(description) {
+function getProjectBulletPoints(description, maxPoints = 2) {
   const lines = String(description || "")
     .split("\n")
     .map((line) => line.replace(/^[-*]\s*/, "").trim())
     .filter(Boolean);
-  const points = lines.slice(0, 3).map((line) => cleanText(line)).filter(Boolean);
+  const points = lines.slice(0, maxPoints).map((line) => clampText(cleanText(line), 150)).filter(Boolean);
   return points.length ? points : ["Built and delivered a complete solution."];
 }
 
@@ -1412,13 +1416,13 @@ export default function ResumeBuilder({
 
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "3.5rem 2rem" }}>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: "#9d94fa", marginBottom: 8, fontWeight: 500 }}>
+          <div style={{ fontSize: 12, color: "var(--c)", marginBottom: 8, fontWeight: 500 }}>
             Guided resume studio
           </div>
-          <h1 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 500, color: "#fff", maxWidth: 780, lineHeight: 1.12 }}>
+          <h1 style={{ fontSize: "clamp(2rem, 4vw, 3rem)", fontWeight: 500, color: "var(--text)", maxWidth: 780, lineHeight: 1.12 }}>
             Build a clean, ATS-ready resume with live templates.
           </h1>
-          <p style={{ color: "rgba(255,255,255,0.46)", marginTop: 10, maxWidth: 640, lineHeight: 1.7 }}>
+          <p style={{ color: "var(--muted)", marginTop: 10, maxWidth: 640, lineHeight: 1.7 }}>
             Import your existing resume, refine each section, choose a template, and export a text-selectable PDF.
           </p>
         </div>
