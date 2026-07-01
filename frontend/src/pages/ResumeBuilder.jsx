@@ -137,12 +137,37 @@ const RESUME_TEMPLATES = [
 ];
 
 const TEMPLATE_THEME = {
-  ats_clean: { accent: "#0b5ed7", paper: "#ffffff", border: "#d1d5db", heading: "#0b5ed7", split: false },
-  modern_split: { accent: "#0b5ed7", paper: "#ffffff", border: "#d1d5db", heading: "#1d4ed8", split: true },
-  executive: { accent: "#8b4513", paper: "#fffdf8", border: "#e5d7c6", heading: "#8b4513", split: false },
-  minimal_mono: { accent: "#111827", paper: "#ffffff", border: "#d1d5db", heading: "#111827", split: false },
-  impact_edge: { accent: "#be123c", paper: "#ffffff", border: "#f3c2cf", heading: "#be123c", split: false },
-  tech_blueprint: { accent: "#0f766e", paper: "#f8fafc", border: "#99f6e4", heading: "#0f766e", split: false },
+  ats_clean: {
+    accent: "#0b5ed7", paper: "#ffffff", border: "#d1d5db", heading: "#0b5ed7", split: false,
+    text: "#1a1a1a", muted: "#475569", mutedLight: "#64748b",
+    chipBg: "rgba(11,94,215,0.07)", chipText: "#1a1a1a", link: "#0b5ed7",
+  },
+  modern_split: {
+    accent: "#1d4ed8", paper: "#ffffff", border: "#d1d5db", heading: "#1d4ed8", split: true,
+    text: "#1a1a1a", muted: "#475569", mutedLight: "#64748b",
+    sidebarBg: "#1d4ed8", sidebarText: "#ffffff", sidebarMuted: "rgba(255,255,255,0.85)",
+    chipBg: "rgba(29,78,216,0.07)", chipText: "#1a1a1a", link: "#1d4ed8",
+  },
+  executive: {
+    accent: "#8b4513", paper: "#fffdf8", border: "#e5d7c6", heading: "#8b4513", split: false,
+    text: "#2b2118", muted: "#6b5b4f", mutedLight: "#8a7a6a",
+    chipBg: "rgba(139,69,19,0.08)", chipText: "#2b2118", link: "#8b4513",
+  },
+  minimal_mono: {
+    accent: "#111827", paper: "#ffffff", border: "#d1d5db", heading: "#111827", split: false,
+    text: "#111827", muted: "#4b5563", mutedLight: "#6b7280",
+    chipBg: "rgba(17,24,39,0.05)", chipText: "#111827", link: "#111827",
+  },
+  impact_edge: {
+    accent: "#be123c", paper: "#ffffff", border: "#f3c2cf", heading: "#be123c", split: false,
+    text: "#3f0d18", muted: "#7c2d40", mutedLight: "#9f4a5e",
+    chipBg: "rgba(190,18,60,0.07)", chipText: "#3f0d18", link: "#be123c",
+  },
+  tech_blueprint: {
+    accent: "#0f766e", paper: "#f8fafc", border: "#99f6e4", heading: "#0f766e", split: false,
+    text: "#0f172a", muted: "#475569", mutedLight: "#64748b",
+    chipBg: "rgba(15,118,110,0.08)", chipText: "#0f172a", link: "#0f766e",
+  },
 };
 
 function cleanValue(value) {
@@ -313,104 +338,39 @@ function sanitizePdfName(name) {
   return cleaned || "resume_ats_optimized";
 }
 
-function drawPdfLink(pdf, label, href, x, y) {
-  const url = normalizeUrl(href);
-  if (!url) return;
-  pdf.setTextColor(0, 90, 190);
-  pdf.textWithLink(label, x, y, { url });
-  const width = pdf.getTextWidth(label);
-  pdf.setDrawColor(0, 90, 190);
-  pdf.line(x, y + 1.5, x + width, y + 1.5);
-  pdf.setTextColor(26, 26, 26);
+function hexToRgb(hex, fallback = [11, 94, 215]) {
+  const match = String(hex || "").trim().match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+  if (!match) return fallback;
+  return [parseInt(match[1], 16), parseInt(match[2], 16), parseInt(match[3], 16)];
 }
 
-function exportStructuredResumeAsPdf(data, fileName) {
+function drawPdfLink(pdf, label, href, x, y, color = [0, 90, 190], textColor = [26, 26, 26], measureOnly = false) {
+  const url = normalizeUrl(href);
+  if (!url || measureOnly) return;
+  pdf.setTextColor(...color);
+  pdf.textWithLink(label, x, y, { url });
+  const width = pdf.getTextWidth(label);
+  pdf.setDrawColor(...color);
+  pdf.line(x, y + 1.5, x + width, y + 1.5);
+  pdf.setTextColor(...textColor);
+}
+
+const PDF_MIN_SCALE = 0.68;
+
+function exportStructuredResumeAsPdf(data, fileName, theme = TEMPLATE_THEME.ats_clean) {
   const safe = sanitizeStructuredData(data);
+  const accentRgb = hexToRgb(theme.accent);
+  const headingRgb = hexToRgb(theme.heading, accentRgb);
+  const textRgb = hexToRgb(theme.text, [26, 26, 26]);
+  const mutedRgb = hexToRgb(theme.muted, [71, 85, 105]);
+  const mutedLightRgb = hexToRgb(theme.mutedLight, [100, 116, 139]);
+  const linkRgb = hexToRgb(theme.link, accentRgb);
   const pdf = new jsPDF("p", "pt", "a4");
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 22;
   const contentWidth = pageWidth - margin * 2;
-  const lineHeight = 10.2;
-  let y = margin;
-  let pdfHasRoom = true;
-
-  const ensureSpace = (height = lineHeight) => {
-    const hasRoom = y + height <= pageHeight - margin;
-    if (!hasRoom) pdfHasRoom = false;
-    return hasRoom;
-  };
-
-  const writeWrapped = (text, options = {}) => {
-    const indent = options.indent || 0;
-    const font = options.font || "helvetica";
-    const style = options.style || "normal";
-    const size = options.size || 8.8;
-    const color = options.color || [31, 41, 55];
-    const maxWidth = options.maxWidth || (contentWidth - indent);
-    const value = cleanText(text);
-    if (!value || !pdfHasRoom) return;
-
-    pdf.setFont(font, style);
-    pdf.setFontSize(size);
-    pdf.setTextColor(...color);
-    const lines = pdf.splitTextToSize(value, maxWidth);
-    lines.forEach((line) => {
-      if (!ensureSpace(lineHeight)) return;
-      pdf.text(line, margin + indent, y);
-      y += lineHeight;
-    });
-  };
-
-  const writeSection = (label) => {
-    if (!pdfHasRoom) return false;
-    y += 3;
-    if (!ensureSpace(14)) return false;
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9.2);
-    pdf.setTextColor(11, 94, 215);
-    pdf.text(String(label || "").toUpperCase(), margin, y);
-    const textWidth = pdf.getTextWidth(String(label || "").toUpperCase());
-    pdf.setDrawColor(11, 94, 215);
-    pdf.setLineWidth(0.7);
-    pdf.line(margin + textWidth + 8, y - 3, pageWidth - margin, y - 3);
-    y += 6;
-    return true;
-  };
-
-  const writeSkillLine = (line) => {
-    if (!pdfHasRoom) return;
-    const text = cleanText(line);
-    const separatorIndex = text.indexOf(":");
-    if (separatorIndex < 0) {
-      writeWrapped(text);
-      return;
-    }
-
-    const label = text.slice(0, separatorIndex + 1);
-    const value = text.slice(separatorIndex + 1).trim();
-    const size = 8.8;
-    pdf.setFontSize(size);
-    const labelWidth = pdf.getTextWidth(label);
-    const valueLines = pdf.splitTextToSize(value, contentWidth - labelWidth - 4);
-    const lines = valueLines.length ? valueLines : [""];
-
-    lines.forEach((valueLine, index) => {
-      if (!ensureSpace(lineHeight)) return;
-      if (index === 0) {
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(31, 41, 55);
-        pdf.text(label, margin, y);
-        pdf.setFont("helvetica", "normal");
-        pdf.text(valueLine, margin + labelWidth + 4, y);
-      } else {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(31, 41, 55);
-        pdf.text(valueLine, margin + labelWidth + 4, y);
-      }
-      y += lineHeight;
-    });
-  };
+  const baseLineHeight = 10.2;
 
   const list = (items = []) => items.filter(Boolean).join(" | ");
   const skillLines = buildSkillsLines(safe.skills);
@@ -418,115 +378,226 @@ function exportStructuredResumeAsPdf(data, fileName) {
   const hasProjects = safe.projects.some((item) => item.name || item.description || item.techStack || item.demoLink || item.sourceLink);
   const hasCerts = safe.certifications.some(Boolean);
 
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(18);
-  pdf.setTextColor(11, 94, 215);
-  pdf.text(safe.name || "Your Name", margin, y);
-  y += 13;
+  const renderPass = (scale, measureOnly) => {
+    let y = margin;
+    let pdfHasRoom = true;
+    const lineHeight = baseLineHeight * scale;
+    const pageLimit = measureOnly ? Infinity : pageHeight - margin;
 
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8.7);
-  pdf.setTextColor(51, 65, 85);
+    const ensureSpace = (height = lineHeight) => {
+      const hasRoom = y + height <= pageLimit;
+      if (!hasRoom) pdfHasRoom = false;
+      return hasRoom;
+    };
 
-  const contacts = [
-    safe.email ? { label: safe.email, href: `mailto:${safe.email}` } : null,
-    safe.phone ? { label: safe.phone, href: `tel:${safe.phone}` } : null,
-    safe.linkedin ? { label: safe.linkedin, href: safe.linkedin } : null,
-    safe.github ? { label: safe.github, href: safe.github } : null,
-  ].filter(Boolean);
+    const writeWrapped = (text, options = {}) => {
+      const indent = options.indent || 0;
+      const font = options.font || "helvetica";
+      const style = options.style || "normal";
+      const size = (options.size || 8.8) * scale;
+      const color = options.color || textRgb;
+      const maxWidth = options.maxWidth || (contentWidth - indent);
+      const value = cleanText(text);
+      if (!value || !pdfHasRoom) return;
 
-  let xCursor = margin;
-  contacts.forEach((contact, index) => {
-    const labelWidth = pdf.getTextWidth(contact.label);
-    const sepWidth = index > 0 ? pdf.getTextWidth(" | ") : 0;
-    if (xCursor + sepWidth + labelWidth > pageWidth - margin) {
-      if (!ensureSpace(lineHeight)) return;
-      y += lineHeight;
-      xCursor = margin;
-    }
-    if (index > 0 && xCursor > margin) {
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(" | ", xCursor, y);
-      xCursor += sepWidth;
-    }
-    drawPdfLink(pdf, contact.label, contact.href, xCursor, y);
-    xCursor += labelWidth;
-  });
-  y += 8;
-  pdf.setDrawColor(11, 94, 215);
-  pdf.setLineWidth(1);
-  pdf.line(margin, y, pageWidth - margin, y);
-  y += 8;
-
-  writeSection("Professional Summary");
-  writeWrapped(safe.summary || "Add a concise summary for your profile.");
-
-  writeSection("Technical Skills");
-  skillLines.forEach((line) => writeSkillLine(line));
-
-  if (hasExperience) {
-    writeSection("Work Experience");
-    safe.experience.forEach((item) => {
-      const heading = item.title || "Role";
-      writeWrapped(heading, { style: "bold", color: [26, 26, 26] });
-      writeWrapped(list([item.company, item.duration]), { color: [71, 85, 105] });
-      writeWrapped(item.description || "No description provided.");
-      y += 1;
-    });
-  }
-
-  writeSection("Education");
-  safe.education.forEach((item) => {
-    const percentageText = extractEducationPercentage(item);
-    writeWrapped(item.degree || "Degree", { style: "bold", color: [26, 26, 26] });
-    writeWrapped(list([item.institution, item.year, percentageText && `Percentage: ${percentageText}`]));
-    y += 1;
-  });
-
-  if (hasProjects) {
-    writeSection("Projects");
-    safe.projects.forEach((item, index) => {
-      if (!ensureSpace(lineHeight * 3)) return;
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9);
-      pdf.setTextColor(26, 26, 26);
-      const projectName = `${index + 1}. ${item.name || "Project"}`;
-      pdf.text(projectName, margin, y);
-      let projectX = margin + pdf.getTextWidth(projectName);
-      if (item.demoLink || item.sourceLink) {
-        pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(" - ", projectX + 3, y);
-        projectX += pdf.getTextWidth(" - ") + 3;
-        if (item.demoLink) {
-          drawPdfLink(pdf, "Demo", item.demoLink, projectX, y);
-          projectX += pdf.getTextWidth("Demo") + 10;
+      pdf.setFont(font, style);
+      pdf.setFontSize(size);
+      const lines = pdf.splitTextToSize(value, maxWidth);
+      lines.forEach((line) => {
+        if (!ensureSpace(lineHeight)) return;
+        if (!measureOnly) {
+          pdf.setTextColor(...color);
+          pdf.text(line, margin + indent, y);
         }
-        if (item.sourceLink) {
-          if (item.demoLink) {
-            pdf.setTextColor(100, 116, 139);
-            pdf.text("|", projectX, y);
-            projectX += pdf.getTextWidth("|") + 8;
-          }
-          drawPdfLink(pdf, "Source", item.sourceLink, projectX, y);
-        }
-      }
-      y += lineHeight;
-      if (item.techStack) writeWrapped(item.techStack, { color: [71, 85, 105], size: 8.4 });
-      getProjectBulletPoints(item.description, 2).forEach((line) => {
-        writeWrapped(`• ${line}`, { size: 8.5 });
+        y += lineHeight;
       });
-      y += 1;
-    });
-  }
+    };
 
-  if (hasCerts) {
-    writeSection("Certifications");
-    writeWrapped(
-      safe.certifications.filter(Boolean).map(formatCertificationName).filter(Boolean).join(" | "),
-      { size: 8.5 }
-    );
-  }
+    const writeSection = (label) => {
+      if (!pdfHasRoom) return false;
+      y += 3 * scale;
+      if (!ensureSpace(14 * scale)) return false;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9.2 * scale);
+      const upperLabel = String(label || "").toUpperCase();
+      const textWidth = pdf.getTextWidth(upperLabel);
+      if (!measureOnly) {
+        pdf.setTextColor(...headingRgb);
+        pdf.text(upperLabel, margin, y);
+        pdf.setDrawColor(...headingRgb);
+        pdf.setLineWidth(0.7);
+        pdf.line(margin + textWidth + 8, y - 3 * scale, pageWidth - margin, y - 3 * scale);
+      }
+      y += 6 * scale;
+      return true;
+    };
+
+    const writeSkillLine = (line) => {
+      if (!pdfHasRoom) return;
+      const text = cleanText(line);
+      const separatorIndex = text.indexOf(":");
+      if (separatorIndex < 0) {
+        writeWrapped(text);
+        return;
+      }
+
+      const label = text.slice(0, separatorIndex + 1);
+      const value = text.slice(separatorIndex + 1).trim();
+      pdf.setFontSize(8.8 * scale);
+      pdf.setFont("helvetica", "bold");
+      const labelWidth = pdf.getTextWidth(label);
+      const valueLines = pdf.splitTextToSize(value, contentWidth - labelWidth - 4);
+      const lines = valueLines.length ? valueLines : [""];
+
+      lines.forEach((valueLine, index) => {
+        if (!ensureSpace(lineHeight)) return;
+        if (!measureOnly) {
+          if (index === 0) {
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(...textRgb);
+            pdf.text(label, margin, y);
+            pdf.setFont("helvetica", "normal");
+            pdf.text(valueLine, margin + labelWidth + 4, y);
+          } else {
+            pdf.setFont("helvetica", "normal");
+            pdf.setTextColor(...textRgb);
+            pdf.text(valueLine, margin + labelWidth + 4, y);
+          }
+        }
+        y += lineHeight;
+      });
+    };
+
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18 * scale);
+    if (!measureOnly) {
+      pdf.setTextColor(...headingRgb);
+      pdf.text(safe.name || "Your Name", margin, y);
+    }
+    y += 13 * scale;
+
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.7 * scale);
+
+    const contacts = [
+      safe.email ? { label: safe.email, href: `mailto:${safe.email}` } : null,
+      safe.phone ? { label: safe.phone, href: `tel:${safe.phone}` } : null,
+      safe.linkedin ? { label: safe.linkedin, href: safe.linkedin } : null,
+      safe.github ? { label: safe.github, href: safe.github } : null,
+    ].filter(Boolean);
+
+    let xCursor = margin;
+    contacts.forEach((contact, index) => {
+      const labelWidth = pdf.getTextWidth(contact.label);
+      const sepWidth = index > 0 ? pdf.getTextWidth(" | ") : 0;
+      if (xCursor + sepWidth + labelWidth > pageWidth - margin) {
+        if (!ensureSpace(lineHeight)) return;
+        y += lineHeight;
+        xCursor = margin;
+      }
+      if (index > 0 && xCursor > margin) {
+        if (!measureOnly) {
+          pdf.setTextColor(...mutedRgb);
+          pdf.text(" | ", xCursor, y);
+        }
+        xCursor += sepWidth;
+      }
+      drawPdfLink(pdf, contact.label, contact.href, xCursor, y, linkRgb, textRgb, measureOnly);
+      xCursor += labelWidth;
+    });
+    y += 8 * scale;
+    if (!measureOnly) {
+      pdf.setDrawColor(...accentRgb);
+      pdf.setLineWidth(1);
+      pdf.line(margin, y, pageWidth - margin, y);
+    }
+    y += 8 * scale;
+
+    writeSection("Professional Summary");
+    writeWrapped(safe.summary || "Add a concise summary for your profile.");
+
+    writeSection("Technical Skills");
+    skillLines.forEach((line) => writeSkillLine(line));
+
+    if (hasExperience) {
+      writeSection("Work Experience");
+      safe.experience.forEach((item) => {
+        const heading = item.title || "Role";
+        writeWrapped(heading, { style: "bold", color: textRgb });
+        writeWrapped(list([item.company, item.duration]), { color: mutedRgb });
+        writeWrapped(item.description || "No description provided.");
+        y += 1 * scale;
+      });
+    }
+
+    writeSection("Education");
+    safe.education.forEach((item) => {
+      const percentageText = extractEducationPercentage(item);
+      writeWrapped(item.degree || "Degree", { style: "bold", color: textRgb });
+      writeWrapped(list([item.institution, item.year, percentageText && `Percentage: ${percentageText}`]));
+      y += 1 * scale;
+    });
+
+    if (hasProjects) {
+      writeSection("Projects");
+      safe.projects.forEach((item, index) => {
+        if (!ensureSpace(lineHeight * 3)) return;
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9 * scale);
+        const projectName = `${index + 1}. ${item.name || "Project"}`;
+        if (!measureOnly) {
+          pdf.setTextColor(...textRgb);
+          pdf.text(projectName, margin, y);
+        }
+        let projectX = margin + pdf.getTextWidth(projectName);
+        if (item.demoLink || item.sourceLink) {
+          pdf.setFont("helvetica", "normal");
+          if (!measureOnly) {
+            pdf.setTextColor(...mutedLightRgb);
+            pdf.text(" - ", projectX + 3, y);
+          }
+          projectX += pdf.getTextWidth(" - ") + 3;
+          if (item.demoLink) {
+            drawPdfLink(pdf, "Demo", item.demoLink, projectX, y, linkRgb, textRgb, measureOnly);
+            projectX += pdf.getTextWidth("Demo") + 10;
+          }
+          if (item.sourceLink) {
+            if (item.demoLink) {
+              if (!measureOnly) {
+                pdf.setTextColor(...mutedLightRgb);
+                pdf.text("|", projectX, y);
+              }
+              projectX += pdf.getTextWidth("|") + 8;
+            }
+            drawPdfLink(pdf, "Source", item.sourceLink, projectX, y, linkRgb, textRgb, measureOnly);
+          }
+        }
+        y += lineHeight;
+        if (item.techStack) writeWrapped(item.techStack, { color: mutedRgb, size: 8.4 });
+        getProjectBulletPoints(item.description, 2).forEach((line) => {
+          writeWrapped(`• ${line}`, { size: 8.5 });
+        });
+        y += 1 * scale;
+      });
+    }
+
+    if (hasCerts) {
+      writeSection("Certifications");
+      writeWrapped(
+        safe.certifications.filter(Boolean).map(formatCertificationName).filter(Boolean).join(" | "),
+        { size: 8.5 }
+      );
+    }
+
+    return y;
+  };
+
+  const measuredHeight = renderPass(1, true) - margin;
+  const availableHeight = pageHeight - margin * 2;
+  const scale = measuredHeight > availableHeight
+    ? Math.max(PDF_MIN_SCALE, availableHeight / measuredHeight)
+    : 1;
+  renderPass(scale, false);
 
   pdf.save(`${sanitizePdfName(fileName)}.pdf`);
 }
@@ -679,7 +750,7 @@ function getProjectBulletPoints(description, maxPoints = 2) {
   return points.length ? points : ["Built and delivered a complete solution."];
 }
 
-function ProjectHeadingWithLinks({ item, index = 0, fontSize = 10.5 }) {
+function ProjectHeadingWithLinks({ item, index = 0, fontSize = 10.5, linkColor = "#0b5ed7", mutedColor = "#64748b" }) {
   const hasDemo = Boolean(item?.demoLink);
   const hasSource = Boolean(item?.sourceLink);
   return (
@@ -688,13 +759,13 @@ function ProjectHeadingWithLinks({ item, index = 0, fontSize = 10.5 }) {
       {(hasDemo || hasSource) ? (
         <span style={{ fontSize, whiteSpace: "nowrap" }}>
           {hasDemo ? (
-            <a href={normalizeUrl(item.demoLink)} target="_blank" rel="noreferrer" style={{ color: "#0b5ed7", textDecoration: "none" }}>
+            <a href={normalizeUrl(item.demoLink)} target="_blank" rel="noreferrer" style={{ color: linkColor, textDecoration: "none" }}>
               Demo
             </a>
           ) : null}
-          {(hasDemo && hasSource) ? <span style={{ color: "#64748b" }}> | </span> : null}
+          {(hasDemo && hasSource) ? <span style={{ color: mutedColor }}> | </span> : null}
           {hasSource ? (
-            <a href={normalizeUrl(item.sourceLink)} target="_blank" rel="noreferrer" style={{ color: "#0b5ed7", textDecoration: "none" }}>
+            <a href={normalizeUrl(item.sourceLink)} target="_blank" rel="noreferrer" style={{ color: linkColor, textDecoration: "none" }}>
               Source
             </a>
           ) : null}
@@ -719,7 +790,7 @@ function ResumeTemplateBase({ theme, data }) {
           background: theme.paper,
           border: `1px solid ${theme.border}`,
           borderRadius: 8,
-          color: "#1a1a1a",
+          color: theme.text,
           fontSize: 10.5,
           lineHeight: 1.4,
           padding: 12,
@@ -728,8 +799,8 @@ function ResumeTemplateBase({ theme, data }) {
         <div style={{ display: "grid", gridTemplateColumns: "0.33fr 0.67fr" }}>
           <div
             style={{
-              background: "#1e293b",
-              color: "#ffffff",
+              background: theme.sidebarBg,
+              color: theme.sidebarText,
               borderRadius: 6,
               padding: 12,
               marginRight: 10,
@@ -757,15 +828,15 @@ function ResumeTemplateBase({ theme, data }) {
               </div>
             ) : null}
 
-            <SectionTitle label="Technical Skills" color="#ffffff" />
+            <SectionTitle label="Technical Skills" color={theme.sidebarText} />
             <div style={{ display: "grid", gap: 3 }}>
               {skillLines.map((line) => (
                 <SkillLine
                   key={line}
                   line={line}
                   fontSize={9.3}
-                  darkLabelColor="#ffffff"
-                  valueColor="rgba(255,255,255,0.95)"
+                  darkLabelColor={theme.sidebarText}
+                  valueColor={theme.sidebarMuted}
                 />
               ))}
             </div>
@@ -780,7 +851,7 @@ function ResumeTemplateBase({ theme, data }) {
               ? safe.experience.map((item, index) => (
                   <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
                     <div style={{ fontWeight: 700 }}>{item.title || "Role"}</div>
-                    <div style={{ color: "#334155", fontSize: 10.5 }}>
+                    <div style={{ color: theme.muted, fontSize: 10.5 }}>
                       {[item.company, item.duration].filter(Boolean).join(" | ")}
                     </div>
                     <div style={{ whiteSpace: "pre-wrap" }}>{item.description || "No description provided."}</div>
@@ -808,10 +879,10 @@ function ResumeTemplateBase({ theme, data }) {
             {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
             {safe.projects.map((item, index) => (
               <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-                <ProjectHeadingWithLinks item={item} index={index} fontSize={10} />
-                {item.techStack ? <div style={{ fontSize: 10, color: "#475569" }}>{item.techStack}</div> : null}
+                <ProjectHeadingWithLinks item={item} index={index} fontSize={10} linkColor={theme.link} mutedColor={theme.mutedLight} />
+                {item.techStack ? <div style={{ fontSize: 10, color: theme.muted }}>{item.techStack}</div> : null}
                 {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
-                  <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
+                  <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: theme.text }}>
                     • {line}
                   </div>
                 ))}
@@ -827,8 +898,8 @@ function ResumeTemplateBase({ theme, data }) {
                     border: `1px solid ${theme.border}`,
                     borderRadius: 999,
                     padding: "2px 7px",
-                    color: "#1f2937",
-                    background: "rgba(15,23,42,0.03)",
+                    color: theme.chipText,
+                    background: theme.chipBg,
                     fontSize: 9.4,
                   }}
                 >
@@ -848,7 +919,7 @@ function ResumeTemplateBase({ theme, data }) {
         background: theme.paper,
         border: `1px solid ${theme.border}`,
         borderRadius: 8,
-        color: "#1a1a1a",
+        color: theme.text,
         fontSize: 10.5,
         lineHeight: 1.4,
         padding: 12,
@@ -856,7 +927,7 @@ function ResumeTemplateBase({ theme, data }) {
     >
       <div style={{ borderBottom: `2px solid ${theme.accent}`, paddingBottom: 8 }}>
         <div style={{ fontSize: 24, fontWeight: 800, color: theme.heading }}>{safe.name || "Your Name"}</div>
-        <div style={{ fontSize: 10.1, color: "#334155", marginTop: 4, display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 2 }}>
+        <div style={{ fontSize: 10.1, color: theme.muted, marginTop: 4, display: "flex", flexWrap: "wrap", alignItems: "center", rowGap: 2 }}>
           {[safe.email && (
             <a key="email" href={`mailto:${safe.email}`} style={{ color: "inherit", textDecoration: "none" }}>{safe.email}</a>
           ), safe.phone && (
@@ -893,7 +964,7 @@ function ResumeTemplateBase({ theme, data }) {
       <SectionTitle label="Technical Skills" color={theme.heading} />
       <div style={{ display: "grid", gap: 4 }}>
         {skillLines.map((line) => (
-          <SkillLine key={line} line={line} darkLabelColor="#0f172a" valueColor="#1f2937" fontSize={10.5} />
+          <SkillLine key={line} line={line} darkLabelColor={theme.text} valueColor={theme.muted} fontSize={10.5} />
         ))}
       </div>
 
@@ -901,18 +972,18 @@ function ResumeTemplateBase({ theme, data }) {
       {hasExperience
         ? safe.experience.map((item, index) => (
             <div key={`${item.title}-${index}`} style={{ marginBottom: 8 }}>
-              <div style={{ fontWeight: 700, color: "#1a1a1a" }}>{item.title || "Role"}</div>
-              <div style={{ fontSize: 10.5, color: "#334155" }}>
+              <div style={{ fontWeight: 700, color: theme.text }}>{item.title || "Role"}</div>
+              <div style={{ fontSize: 10.5, color: theme.muted }}>
                 {[item.company, item.duration].filter(Boolean).join(" | ")}
               </div>
-              <div style={{ whiteSpace: "pre-wrap", color: "#1f2937" }}>{item.description || "No description provided."}</div>
+              <div style={{ whiteSpace: "pre-wrap", color: theme.text }}>{item.description || "No description provided."}</div>
             </div>
           ))
         : null}
 
       <SectionTitle label="Education" color={theme.heading} />
       {safe.education.map((item, index) => (
-        <div key={`${item.degree}-${index}`} style={{ marginBottom: 5, color: "#1f2937" }}>
+        <div key={`${item.degree}-${index}`} style={{ marginBottom: 5, color: theme.text }}>
           {(() => {
             const percentageText = extractEducationPercentage(item);
             return (
@@ -930,10 +1001,10 @@ function ResumeTemplateBase({ theme, data }) {
       {hasProjects ? <SectionTitle label="Projects" color={theme.heading} /> : null}
       {safe.projects.map((item, index) => (
         <div key={`${item.name}-${index}`} style={{ marginBottom: 6 }}>
-          <ProjectHeadingWithLinks item={item} index={index} fontSize={10.5} />
-          {item.techStack ? <div style={{ fontSize: 10.5, color: "#334155" }}>{item.techStack}</div> : null}
+          <ProjectHeadingWithLinks item={item} index={index} fontSize={10.5} linkColor={theme.link} mutedColor={theme.mutedLight} />
+          {item.techStack ? <div style={{ fontSize: 10.5, color: theme.muted }}>{item.techStack}</div> : null}
           {getProjectBulletPoints(item.description).map((line, bulletIndex) => (
-            <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: "#1f2937" }}>
+            <div key={`${item.name}-${index}-bullet-${bulletIndex}`} style={{ color: theme.text }}>
               • {line}
             </div>
           ))}
@@ -949,8 +1020,8 @@ function ResumeTemplateBase({ theme, data }) {
               border: `1px solid ${theme.border}`,
               borderRadius: 999,
               padding: "2px 7px",
-              color: "#1f2937",
-              background: "rgba(15,23,42,0.03)",
+              color: theme.chipText,
+              background: theme.chipBg,
               fontSize: 9.8,
             }}
           >
@@ -1362,7 +1433,7 @@ export default function ResumeBuilder({
     setIsExportingPdf(true);
     setError("");
     try {
-      exportStructuredResumeAsPdf(previewData, pdfFileName);
+      exportStructuredResumeAsPdf(previewData, pdfFileName, TEMPLATE_THEME[selectedTemplate] || TEMPLATE_THEME.ats_clean);
       if (buildId) {
         await markBuildDownload(buildId, user?.email || "anonymous");
       }
