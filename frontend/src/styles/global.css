@@ -129,6 +129,11 @@ h1, h2, h3, h4, h5 {
   box-shadow: 0 12px 24px rgba(124, 111, 247, 0.18);
   filter: saturate(1.04);
 }
+.btn-primary:active {
+  transform: scale(0.96);
+  box-shadow: 0 4px 10px rgba(124, 111, 247, 0.24);
+  filter: saturate(1.08);
+}
 
 .btn-secondary {
   font-family: var(--font-main);
@@ -145,6 +150,10 @@ h1, h2, h3, h4, h5 {
 .btn-secondary:hover {
   background: rgba(124,111,247,0.12);
   transform: translateY(-1px);
+}
+.btn-secondary:active {
+  background: rgba(124,111,247,0.18);
+  transform: scale(0.96);
 }
 
 .btn-ghost {
@@ -164,6 +173,11 @@ h1, h2, h3, h4, h5 {
   color: var(--text);
   background: rgba(124,111,247,0.1);
   transform: translateY(-1px);
+}
+.btn-ghost:active {
+  border-color: rgba(124,111,247,0.45);
+  background: rgba(124,111,247,0.16);
+  transform: scale(0.96);
 }
 
 /* ── NAV ── */
@@ -256,6 +270,11 @@ h1, h2, h3, h4, h5 {
   transform: translateY(-2px);
   box-shadow: var(--shadow-strong);
   border-color: rgba(124,111,247,0.22);
+}
+.card:active {
+  transform: scale(0.985);
+  box-shadow: var(--shadow-strong);
+  border-color: rgba(124,111,247,0.3);
 }
 
 .card-head {
