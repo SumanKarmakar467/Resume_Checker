@@ -353,13 +353,7 @@ export default function LandingPage({ navigate, user, onLogout }) {
 
       {/* STATS */}
       <Section>
-        <div
-          style={{
-            display: "flex",
-            borderTop: "1px solid var(--border)",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
+        <div className="landing-stats-row">
           {[
             ["94%", "ats_pass_rate"],
             ["12k+", "resumes_analyzed"],
@@ -367,35 +361,9 @@ export default function LandingPage({ navigate, user, onLogout }) {
             ["3×", "more_callbacks"],
             ["5+", "resume_templates"],
           ].map(([num, label]) => (
-            <div
-              key={label}
-              style={{
-                flex: 1,
-                textAlign: "center",
-                padding: "2rem 1rem",
-                borderRight: "1px solid var(--border)",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "2rem",
-                  fontWeight: 600,
-                  color: "var(--g)",
-                }}
-              >
-                {num}
-              </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12,
-                  color: "var(--muted)",
-                  marginTop: 4,
-                }}
-              >
-                {label}
-              </div>
+            <div key={label} className="landing-stat-item">
+              <div className="landing-stat-num">{num}</div>
+              <div className="landing-stat-label">{label}</div>
             </div>
           ))}
         </div>

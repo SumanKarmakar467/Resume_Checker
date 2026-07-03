@@ -15,6 +15,14 @@ const { notFound, errorHandler } = require('./middleware/error.middleware');
 
 dotenv.config();
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[server] Uncaught exception:', error);
+});
+
 const app = express();
 const PORT = Number(process.env.PORT || 5001);
 const BOOT_TIME = Date.now();
