@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
 const STEPS = [
-  { label: "Parsing document", sub: "Extracting resume text and structure" },
-  { label: "Analyzing keywords", sub: "Matching against job requirements" },
-  { label: "Scoring compatibility", sub: "Running ATS checks" },
-  { label: "Generating suggestions", sub: "Building your personalized report" },
+  { label: "Parsing document", sub: "Extracting resume text and structure", scan: "resume.pdf" },
+  { label: "Analyzing keywords", sub: "Matching against job requirements", scan: "keyword map" },
+  { label: "Scoring compatibility", sub: "Running ATS checks", scan: "ATS score" },
+  { label: "Generating suggestions", sub: "Building your personalized report", scan: "final report" },
 ];
 
 export default function LoadingScreen({ compact = false, progressLabel = "" }) {
@@ -32,13 +32,13 @@ export default function LoadingScreen({ compact = false, progressLabel = "" }) {
         textAlign: "center",
       }}
     >
-      <div style={{ position: "relative", width: 120, height: 120, marginBottom: 36 }}>
+      <div className="analysis-orbit" style={{ width: compact ? 104 : 132, height: compact ? 104 : 132 }}>
         <div
           style={{
             position: "absolute",
             inset: 0,
             borderRadius: "50%",
-            border: "1.5px solid rgba(124,111,247,0.18)",
+            border: "1.5px solid rgba(124,111,247,0.26)",
             animation: "spin 3s linear infinite",
           }}
         >
@@ -86,12 +86,14 @@ export default function LoadingScreen({ compact = false, progressLabel = "" }) {
             animation: "spin 2s linear infinite",
           }}
         />
+        <div className="analysis-scan-line" />
         <div
           style={{
             position: "absolute",
             inset: 40,
             borderRadius: "50%",
-            background: "rgba(124,111,247,0.15)",
+            background: "linear-gradient(135deg, rgba(124,111,247,0.2), rgba(93,202,165,0.16))",
+            border: "1px solid rgba(255,255,255,0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -104,12 +106,31 @@ export default function LoadingScreen({ compact = false, progressLabel = "" }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text)", marginBottom: 8 }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>
         {progressLabel || `${activeStep.label}...`}
       </div>
       <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 30 }}>
         {activeStep.sub}
       </div>
+
+      {!compact ? (
+        <div className="analysis-console" aria-label="ATS analysis progress preview">
+          <div className="analysis-console-head">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="analysis-console-row">
+            <strong>{activeStep.scan}</strong>
+            <em>scanning</em>
+          </div>
+          <div className="analysis-console-bars">
+            <i style={{ width: `${46 + current * 12}%` }} />
+            <i style={{ width: `${58 + current * 9}%` }} />
+            <i style={{ width: `${38 + current * 14}%` }} />
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 340 }}>
         {STEPS.map((step, index) => {
