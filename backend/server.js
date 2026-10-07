@@ -16,7 +16,7 @@ const { notFound, errorHandler } = require('./middleware/error.middleware');
 dotenv.config();
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[server] Unhandled promise rejetion:', reason);
+  console.error('[server] Unhandled promise rejection:', reason);
 });
 
 process.on('uncaughtException', (error) => {
