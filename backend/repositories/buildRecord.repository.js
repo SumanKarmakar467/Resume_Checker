@@ -6,7 +6,7 @@ async function createRecord(payload = {}) {
 }
 
 async function incrementDownload(buildId) {
-  return BuildRecord.findByIdAndpdate(
+  return BuildRecord.findByIdAndUpdate(
     buildId,
     { $inc: { downloadCount: 1 } },
     { new: true, lean: true }
