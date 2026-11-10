@@ -29,7 +29,7 @@ AI-powered ATS Resume Checker built with **React + Express + MongoDB + Gemini**.
 
 ```text
 backend/
-├── server.j
+├── server.js
 ├── package.json
 ├── .env
 ├── config/
